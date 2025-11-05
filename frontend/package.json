@@ -1,0 +1,15 @@
+{
+  "name": "blogging-platform-frontend",
+  "version": "0.1.0",
+  "description": "Frontend for blogging-platform (minimal package.json to allow npm install)",
+  "main": "index.html",
+  "scripts": {
+    "start": "lite-server",
+    "dev": "npm run start"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "lite-server": "^2.6.1"
+  }
+}
