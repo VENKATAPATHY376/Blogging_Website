@@ -1,0 +1,60 @@
+# GitHub Pages Jekyll configuration
+title: "BlogHub - Modern Blogging Platform"
+description: "A responsive, feature-rich blogging platform with rich text editing, image uploads, and social features"
+
+# Include frontend files
+include:
+  - frontend
+  - frontend/assets
+  - frontend/js
+  - frontend/uploads
+
+# Exclude unnecessary files from build
+exclude:
+  - backend/
+  - test/
+  - node_modules/
+  - "*.md"
+  - .git/
+  - .github/
+  - .gitignore
+  - deploy-prep.*
+  - netlify.toml
+  - HOSTING-GUIDE.md
+  - RENDER-DEPLOYMENT.md
+  - COMPLETE-DEPLOYMENT-GUIDE.md
+  - GITHUB-PAGES-DEPLOYMENT.md
+
+# Disable Jekyll processing for frontend assets
+plugins: []
+markdown: kramdown
+highlighter: rouge
+
+# Site settings
+baseurl: ""
+url: "https://VENKATAPATHY376.github.io"
+repository: "VENKATAPATHY376/Blogging_Website"
+
+# Build settings
+safe: true
+incremental: false
+future: false
+unpublished: false
+
+# Liquid settings
+liquid:
+  error_mode: warn
+  strict_filters: false
+  strict_variables: false
+
+# Conversion
+markdown: kramdown
+kramdown:
+  input: GFM
+  hard_wrap: false
+  auto_ids: true
+  footnote_nr: 1
+  entity_output: as_char
+  toc_levels: 1..6
+  smart_quotes: lsquo,rsquo,ldquo,rdquo
+  enable_coderay: false
