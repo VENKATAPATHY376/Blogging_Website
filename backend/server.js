@@ -8,6 +8,16 @@ import commentRoutes from './src/routes/commentroutes.js';
 import uploadRoutes from './src/routes/uploadRoutes.js';
 
 dotenv.config();
+
+// Debug environment variables
+console.log('=== Environment Check ===');
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('PORT:', process.env.PORT);
+console.log('MONGO_URI set:', !!process.env.MONGO_URI);
+console.log('JWT_SECRET set:', !!process.env.JWT_SECRET);
+console.log('CORS_ORIGIN:', process.env.CORS_ORIGIN);
+console.log('========================');
+
 // connectDB returns a promise; start the server only after DB connected
 const app = express();
 app.use(express.json());
