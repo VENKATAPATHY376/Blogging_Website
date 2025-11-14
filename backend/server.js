@@ -9,19 +9,36 @@ import uploadRoutes from './src/routes/uploadRoutes.js';
 
 dotenv.config();
 
-// Debug environment variables
-console.log('=== Environment Check ===');
-console.log('NODE_ENV:', process.env.NODE_ENV);
-console.log('PORT:', process.env.PORT);
-console.log('MONGO_URI set:', !!process.env.MONGO_URI);
-console.log('JWT_SECRET set:', !!process.env.JWT_SECRET);
-console.log('CORS_ORIGIN:', process.env.CORS_ORIGIN);
-console.log('========================');
+console.log('Starting server...');
 
 // connectDB returns a promise; start the server only after DB connected
 const app = express();
 app.use(express.json());
-app.use(cors());
+
+// Configure CORS properly for development and production
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Define allowed origins
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'http://localhost:3001',
+      'https://blogeweb.netlify.app'
+    ];
+    
+    if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
+      return callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+};
+
+app.use(cors(corsOptions));
 
 // Serve frontend static files (single-folder frontend)
 import path from 'path';
@@ -53,21 +70,26 @@ app.get('*', (req, res, next) => {
 
 // express error handler
 app.use((err, req, res, next) => {
-	console.error('Unhandled error:', err && err.stack ? err.stack : err);
 	res.status(500).json({ message: 'Internal server error' });
 });
 
 // start the server after DB connection is established
 const start = async () => {
 	try {
+		console.log('Connecting to database...');
 		await connectDB();
-		const server = app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+		console.log('Database connected');
+		
+		const server = app.listen(PORT, () => {
+			console.log(`Server running on port ${PORT}`);
+		});
+		
 		server.on('error', (err) => {
-			console.error('Server failed to start:', err);
+			console.error('Server error:', err.message);
 			process.exit(1);
 		});
 	} catch (err) {
-		console.error('Failed to start application:', err);
+		console.error('Failed to start:', err.message);
 		process.exit(1);
 	}
 };

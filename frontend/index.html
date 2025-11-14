@@ -609,6 +609,7 @@
         <ul class="navbar-nav me-auto mb-2 mb-lg-0">
           <li class="nav-item"><a class="nav-link" href="#/">Home</a></li>
           <li class="nav-item"><a class="nav-link" href="#/editor">Write</a></li>
+          <li class="nav-item" id="myPostsNav" style="display:none;"><a class="nav-link" href="#/my-posts">My Posts</a></li>
         </ul>
         <div class="d-flex align-items-center">
           <div id="auth-area"></div>
@@ -657,18 +658,24 @@
     else if(hash.startsWith('#/post/')) {
       const id = hash.split('/')[2];
       renderPostView(id);
-    } else if(hash.startsWith('#/login')) renderLoginView();
+    } else if(hash.startsWith('#/my-posts')) renderMyPostsView();
+    else if(hash.startsWith('#/login')) renderLoginView();
     else renderHomeView();
     renderAuthArea();
   }
 
   window.addEventListener('hashchange', router);
   window.addEventListener('load', router);
+  
+  // Debug: Test if JavaScript is working
+
 
   function renderAuthArea(){
     const el = qs('#auth-area');
+    const myPostsNav = qs('#myPostsNav');
     const user = JSON.parse(localStorage.getItem('me') || 'null');
     if(user){
+      myPostsNav.style.display = 'block';
       el.innerHTML = `
         <div class="d-flex align-items-center gap-3">
           <div class="text-end d-none d-md-block">
@@ -686,6 +693,7 @@
         location.hash = '#/';
       };
     } else {
+      myPostsNav.style.display = 'none';
       el.innerHTML = `<a class="btn btn-primary" href="#/login"><i class="bi bi-person-circle"></i> Sign In</a>`;
     }
   }
@@ -767,7 +775,6 @@
         }));
         renderPagination(data.page, data.totalPages);
       }catch(err){
-        console.error(err);
         list.innerHTML = `<div class="col-12"><div class="alert alert-danger">Failed to load posts</div></div>`;
       }
     };
@@ -808,7 +815,7 @@
             });
           });
         }
-      }catch(e){ console.warn('Failed loading tags', e); }
+      }catch(e){ }
       // browse button toggle
       const browseBtn = qs('#browseTopicsBtn');
       if(browseBtn) {
@@ -968,7 +975,7 @@
     const q = window.currentQuill || quill;
     const range = q.getSelection(true) || { index: 0 };
     q.insertEmbed(range.index, 'image', imgUrl);
-      }catch(err){ alert('Image upload failed'); console.error(err); }
+      }catch(err){ alert('Image upload failed'); }
     });
 
     async function submit(publish=false){
@@ -982,7 +989,7 @@
       try{
         const data = await apiFetch('/posts', { method: 'POST', body: JSON.stringify(payload) });
         location.hash = '#/post/' + data._id;
-      }catch(err){ console.error(err); alert('Failed to save post'); }
+      }catch(err){ alert('Failed to save post'); }
     }
 
     qs('#saveDraftBtn').onclick = ()=> submit(false);
@@ -1030,21 +1037,51 @@
       const authorName = post.author?.displayName || post.author?.username || 'Anonymous';
       const initial = authorName.charAt(0).toUpperCase();
       
+      // Check if current user is the author - FIXED LOGIC
+      const currentUser = JSON.parse(localStorage.getItem('me') || 'null');
+      
+
+      
+      let isAuthor = false;
+      
+      if (currentUser && post.author) {
+        // The currentUser object has both 'id' and '_id' properties (both are the same)
+        // The post.author object has '_id' property from MongoDB
+        const currentUserId = String(currentUser.id || currentUser._id);
+        const postAuthorId = String(post.author._id);
+        
+        isAuthor = currentUserId === postAuthorId;
+      }
+      
       container.innerHTML = `
         <div class="container py-4">
           <div class="row">
             <div class="col-lg-8 mx-auto">
               <article>
                 <div class="post-header">
-                  <h1 class="post-title">${escapeHtml(post.title)}</h1>
-                  <div class="author-info">
-                    <div class="author-avatar">${initial}</div>
-                    <div class="author-details">
-                      <div class="author-name">${escapeHtml(authorName)}</div>
-                      <div class="post-date">
-                        <i class="bi bi-calendar3"></i> ${formatDate(post.publishedAt||post.createdAt)}
+                  <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div class="flex-grow-1">
+                      <h1 class="post-title">${escapeHtml(post.title)}</h1>
+                      <div class="author-info">
+                        <div class="author-avatar">${initial}</div>
+                        <div class="author-details">
+                          <div class="author-name">${escapeHtml(authorName)}</div>
+                          <div class="post-date">
+                            <i class="bi bi-calendar3"></i> ${formatDate(post.publishedAt||post.createdAt)}
+                          </div>
+                        </div>
                       </div>
                     </div>
+                    ${isAuthor ? `
+                      <div class="d-flex gap-2">
+                        <button id="editBtn" class="btn btn-outline-primary btn-sm" style="visibility: visible; display: inline-block;">
+                          <i class="bi bi-pencil" style="font-size: 14px;"></i> Edit
+                        </button>
+                        <button id="deleteBtn" class="btn btn-outline-danger btn-sm" style="visibility: visible; display: inline-block;">
+                          <i class="bi bi-trash" style="font-size: 14px;"></i> Delete
+                        </button>
+                      </div>
+                    ` : ''}
                   </div>
                   <div class="mb-3">${(post.tags||[]).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join(' ')}</div>
                 </div>
@@ -1082,34 +1119,78 @@
         </div>
       `;
 
+      // Edit functionality - only for authors
+      if (isAuthor) {
+        qs('#editBtn').onclick = () => toggleEditMode(post);
+        qs('#deleteBtn').onclick = () => deletePost(post);
+      }
+
+      // Like button functionality
       qs('#likeBtn').onclick = async ()=>{
         try{
           const res = await apiFetch(`/posts/${post._id}/like`, { method: 'POST' });
           qs('#likesCount').textContent = res.likes?.length ?? res.likes ?? 0;
           qs('#dislikesCount').textContent = res.dislikes?.length ?? res.dislikes ?? 0;
+          // Update the post object to maintain consistency
+          post.likes = res.likes || [];
+          post.dislikes = res.dislikes || [];
         }catch(err){ handleApiErr(err); }
       };
       
+      // Dislike button functionality
       qs('#dislikeBtn').onclick = async ()=>{
         try{
           const res = await apiFetch(`/posts/${post._id}/dislike`, { method: 'POST' });
           qs('#likesCount').textContent = res.likes?.length ?? res.likes ?? 0;
           qs('#dislikesCount').textContent = res.dislikes?.length ?? res.dislikes ?? 0;
+          // Update the post object to maintain consistency
+          post.likes = res.likes || [];
+          post.dislikes = res.dislikes || [];
         }catch(err){ handleApiErr(err); }
       };
 
+      // Comment submission functionality
       qs('#commentBtn').onclick = async ()=>{
-        const txt = qs('#commentInput').value.trim(); if(!txt) return;
+        const txt = qs('#commentInput').value.trim(); 
+        if(!txt) {
+          alert('Please enter a comment');
+          return;
+        }
+        
+        const commentBtn = qs('#commentBtn');
+        const originalBtnText = commentBtn.innerHTML;
+        
         try{
-          await apiFetch('/comments', { method: 'POST', body: JSON.stringify({ post: post._id, content: txt }) });
+          // Disable button and show loading
+          commentBtn.disabled = true;
+          commentBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Posting...';
+          
+          // Post the comment
+          await apiFetch('/comments', { 
+            method: 'POST', 
+            body: JSON.stringify({ post: post._id, content: txt }) 
+          });
+          
+          // Clear the input
           qs('#commentInput').value = '';
-          await loadComments(post._id);
-        }catch(err){ handleApiErr(err); }
+          
+          // Show success message
+          alert('Comment posted successfully!');
+          
+          // Refresh the entire page to show updated post content and new comment
+          window.location.reload();
+          
+        }catch(err){ 
+          // Restore button state on error
+          commentBtn.disabled = false;
+          commentBtn.innerHTML = originalBtnText;
+
+          handleApiErr(err); 
+        }
       };
 
       renderComments(comments);
     }catch(err){
-      console.error(err);
       container.innerHTML = `
         <div class="container py-5">
           <div class="alert alert-danger">Failed to load post</div>
@@ -1154,7 +1235,7 @@
     try{
       const data = await apiFetch(`/comments?post=${postId}`);
       renderComments(data.items || []);
-    }catch(err){ console.error(err); }
+    }catch(err){ }
   }
 
   function renderLoginView(){
@@ -1224,7 +1305,6 @@
         localStorage.setItem('me', JSON.stringify(j.user));
         location.hash = '#/';
       }catch(err){ 
-        console.error(err); 
         const alertEl = document.createElement('div'); 
         alertEl.id='loginError'; 
         alertEl.className='alert alert-danger'; 
@@ -1310,7 +1390,6 @@
         alert('Account created successfully! Please sign in.');
         location.hash = '#/login';
       }catch(err){ 
-        console.error(err); 
         const alertEl = document.createElement('div'); 
         alertEl.id='registerError'; 
         alertEl.className='alert alert-danger'; 
@@ -1322,11 +1401,869 @@
     };
   }
 
+  async function renderMyPostsView(){
+    const container = qs('#app');
+    const user = JSON.parse(localStorage.getItem('me') || 'null');
+    
+    if (!user) {
+      location.hash = '#/login';
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="container py-5">
+        <div class="row">
+          <div class="col-lg-10 mx-auto">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+              <h2 class="section-title mb-0">My Posts</h2>
+              <a href="#/editor" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Create New Post
+              </a>
+            </div>
+            <div id="myPostsList" class="posts-grid"></div>
+            <div class="d-flex justify-content-center mb-5">
+              <nav><ul id="myPostsPagination" class="pagination"></ul></nav>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    let page = 1, limit = 9;
+    const loadMyPosts = async () => {
+      const list = qs('#myPostsList');
+      list.innerHTML = '<div class="col-12 text-center py-5"><div class="loading-spinner"></div></div>';
+      
+      try {
+        // Filter posts by the current user
+        const data = await apiFetch(`/posts?page=${page}&limit=${limit}`);
+        const allPosts = data.items || [];
+        
+        // Filter to only show posts by current user
+        const myPosts = allPosts.filter(post => post.author && (post.author._id === user.id || post.author._id === user._id));
+        
+        if (myPosts.length === 0) {
+          list.innerHTML = `
+            <div class="col-12">
+              <div class="empty-state">
+                <i class="bi bi-journal-plus"></i>
+                <h4>No posts yet</h4>
+                <p>Start sharing your thoughts with the world!</p>
+                <a href="#/editor" class="btn btn-primary mt-3">
+                  <i class="bi bi-plus-circle"></i> Write your first post
+                </a>
+              </div>
+            </div>
+          `;
+          return;
+        }
+        
+        list.innerHTML = myPosts.map(p => myPostCardHtml(p)).join('');
+        
+        // Add event listeners for view, edit, delete actions
+        qsa('[data-action="view"]').forEach(el => {
+          el.addEventListener('click', () => {
+            const id = el.dataset.id;
+            location.hash = '#/post/' + id;
+          });
+        });
+        
+        qsa('[data-action="edit"]').forEach(el => {
+          el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = el.dataset.id;
+            location.hash = '#/post/' + id; // Will show edit buttons since it's user's post
+          });
+        });
+        
+        qsa('[data-action="delete"]').forEach(el => {
+          el.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const id = el.dataset.id;
+            const title = el.dataset.title;
+            
+            const confirmDelete = confirm(
+              `Are you sure you want to delete "${title}"?\n\nThis action cannot be undone.`
+            );
+            
+            if (!confirmDelete) return;
+            
+            try {
+              await apiFetch(`/posts/${id}`, { method: 'DELETE' });
+              loadMyPosts(); // Refresh the list
+              alert('Post deleted successfully');
+            } catch (err) {
+
+              alert('Failed to delete post: ' + (err.body?.message || 'Unknown error'));
+            }
+          });
+        });
+        
+      } catch (err) {
+
+        list.innerHTML = `<div class="col-12"><div class="alert alert-danger">Failed to load your posts</div></div>`;
+      }
+    };
+
+    loadMyPosts();
+  }
+
+  function myPostCardHtml(p) {
+    const excerpt = (p.content || '').replace(/<[^>]+>/g,'').slice(0,180);
+    const category = (p.tags && p.tags[0]) || 'Article';
+
+    return `
+      <div class="post-card">
+        <div style="position:relative;">
+          <div class="post-image" data-action="view" data-id="${escapeHtml(p._id)}" style="cursor: pointer;">
+            <img src="${(() => {
+              const fallback = 'https://picsum.photos/800/500?random=' + encodeURIComponent(p._id || Math.random());
+              if (!p.image) return fallback;
+              try {
+                if (/^https?:\/\//.test(p.image)) return p.image;
+                if (p.image.startsWith('/')) return API_ORIGIN + p.image;
+                return API_ORIGIN + '/uploads/' + encodeURIComponent(p.image);
+              } catch(e) { return fallback; }
+            })()}" alt="${escapeHtml(p.title)}" onerror="this.onerror=null;this.src='https://picsum.photos/800/500?random=${escapeHtml(p._id||Math.random())}'" />
+          </div>
+          <div class="post-category">${escapeHtml(category)}</div>
+          <div style="position: absolute; top: 12px; right: 12px;">
+            <div class="dropdown">
+              <button class="btn btn-sm btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown" style="background: rgba(255,255,255,0.95); border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <i class="bi bi-three-dots"></i>
+              </button>
+              <ul class="dropdown-menu">
+                <li><button class="dropdown-item" data-action="edit" data-id="${escapeHtml(p._id)}"><i class="bi bi-pencil"></i> Edit</button></li>
+                <li><button class="dropdown-item text-danger" data-action="delete" data-id="${escapeHtml(p._id)}" data-title="${escapeHtml(p.title)}"><i class="bi bi-trash"></i> Delete</button></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div class="card-body" data-action="view" data-id="${escapeHtml(p._id)}" style="cursor: pointer;">
+          <h5 class="card-title">${escapeHtml(p.title)}</h5>
+          <p class="card-text">${escapeHtml(excerpt)}${(excerpt.length>=180? '...':'')}</p>
+        </div>
+        <div class="card-footer">
+          <div class="author-area">
+            <div class="small text-muted">
+              <i class="bi bi-calendar3"></i> ${formatDate(p.publishedAt||p.createdAt)}
+              ${p.published ? '<span class="badge bg-success ms-2">Published</span>' : '<span class="badge bg-secondary ms-2">Draft</span>'}
+            </div>
+          </div>
+          <div style="display:flex;gap:0.75rem;align-items:center">
+            <div class="stat-item"><i class="bi bi-heart-fill" style="color:#ef4444"></i> <span>${p.likes?.length||0}</span></div>
+            <div class="stat-item"><i class="bi bi-chat-dots-fill"></i> <span>${p.commentsCount||0}</span></div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // Global wrapper functions for inline onclick handlers
+  // These must be defined before toggleEditMode so they're available when HTML is created
+  window.handleRepostClick = function(event) {
+    try {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+      }
+
+      
+      // Try to get post from window._currentEditPost first
+      let post = window._currentEditPost;
+
+      
+      // Fallback: Try to get post ID from button data attribute or URL
+      if (!post || !post._id) {
+
+        
+        let postId = null;
+        
+        // Try button data attribute
+        const repostBtn = event ? (event.target.closest('#repostBtn') || document.querySelector('#repostBtn')) : document.querySelector('#repostBtn');
+        if (repostBtn) {
+          postId = repostBtn.getAttribute('data-post-id');
+
+        }
+        
+        // Try window._currentEditPostId
+        if (!postId && window._currentEditPostId) {
+          postId = window._currentEditPostId;
+
+        }
+        
+        // Try URL hash
+        if (!postId) {
+          const hash = location.hash || '';
+          const match = hash.match(/#\/post\/([^\/]+)/);
+          if (match && match[1]) {
+            postId = match[1];
+
+          }
+        }
+        
+        if (postId) {
+          // Reconstruct post object from current form values
+          const titleElement = document.querySelector('#editTitle');
+          const contentElement = document.querySelector('#editContent');
+          const tagsElement = document.querySelector('#editTags');
+          
+          if (titleElement && contentElement) {
+            post = {
+              _id: postId,
+              title: titleElement.value || titleElement.textContent || 'Untitled',
+              content: contentElement.innerHTML || contentElement.textContent || '',
+              tags: tagsElement ? tagsElement.value.split(',').map(t => t.trim()).filter(Boolean) : []
+            };
+
+          } else {
+
+          }
+        } else {
+
+        }
+      }
+      
+      // Even if we don't have a full post object, we can still repost using form values
+      // Create a minimal post object if needed
+      if (!post || !post._id) {
+        // Try one more time to get post ID from URL
+        const hash = location.hash || '';
+        const match = hash.match(/#\/post\/([^\/]+)/);
+        const postId = match && match[1] ? match[1] : 'unknown';
+        
+        // Create minimal post object - the function will read values from form fields
+        post = {
+          _id: postId,
+          title: '',
+          content: '',
+          tags: []
+        };
+
+      }
+      
+      if (post && post._id) {
+
+        handleRepostButtonClick(post);
+      } else {
+
+        showErrorMessage('Error', 'Unable to repost: post data not found. Please try refreshing the page and editing again.');
+      }
+    } catch (error) {
+
+      showErrorMessage('Error', 'Failed to repost: ' + (error.message || 'Unknown error'));
+    }
+    return false;
+  };
+
+  window.handleCancelEdit = function(event) {
+    try {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+      }
+
+      const post = window._currentEditPost;
+      if (post) {
+        exitEditMode(post);
+      } else {
+
+      }
+    } catch (error) {
+
+      showErrorMessage('Error', 'Failed to cancel edit: ' + (error.message || 'Unknown error'));
+    }
+    return false;
+  };
+
+  function toggleEditMode(post) {
+
+    
+    if (!post) {
+
+      showErrorMessage('Error', 'Cannot edit: post data not available');
+      return;
+    }
+    
+    if (!post._id) {
+
+    }
+    
+    const postContent = qs('#postContent');
+    const postTitle = qs('.post-title');
+    const tagsContainer = postTitle.parentElement.parentElement.querySelector('.mb-3'); // The tags div
+    
+    // Store original content
+    const originalTitle = post.title || '';
+    const originalContent = post.content || '';
+    const originalTags = post.tags || [];
+    
+    // Replace title with input
+    postTitle.innerHTML = `<input type="text" id="editTitle" class="form-control form-control-lg" value="${escapeHtml(originalTitle)}">`;
+    
+    // Replace content with editable div
+    postContent.innerHTML = `
+      <div class="editor-toolbar mb-2" style="background: var(--light-bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem; display: flex; gap: 0.5rem;">
+        <button type="button" class="editor-btn" title="Bold" onclick="document.execCommand('bold')"><i class="bi bi-type-bold"></i></button>
+        <button type="button" class="editor-btn" title="Italic" onclick="document.execCommand('italic')"><i class="bi bi-type-italic"></i></button>
+        <button type="button" class="editor-btn" title="Heading" onclick="document.execCommand('formatBlock', false, 'h2')"><i class="bi bi-type-h2"></i></button>
+        <button type="button" class="editor-btn" title="List" onclick="document.execCommand('insertUnorderedList')"><i class="bi bi-list-ul"></i></button>
+      </div>
+      <div id="editContent" contenteditable="true" class="border rounded p-3" style="min-height: 300px; outline: none; border: 2px solid var(--border); transition: border-color 0.2s ease;">${originalContent}</div>
+      
+      <!-- Action Buttons -->
+      <div class="d-flex gap-3 justify-content-center mt-4" id="editActionButtons">
+        <button type="button" 
+                id="repostBtn" 
+                class="btn btn-success btn-lg px-4" 
+                style="font-weight: 600; cursor: pointer; pointer-events: auto !important; position: relative; z-index: 1000;"
+                onclick="if(window.handleRepostClick){window.handleRepostClick(event);} return false;"
+                data-post-id="${escapeHtml(post._id)}">
+          <i class="bi bi-check-circle"></i> Update Post
+        </button>
+        <button type="button" 
+                id="cancelEditBtn" 
+                class="btn btn-outline-secondary btn-lg px-4" 
+                style="cursor: pointer; pointer-events: auto !important;"
+                onclick="if(window.handleCancelEdit){window.handleCancelEdit(event);} return false;"
+                data-post-id="${escapeHtml(post._id)}">
+          <i class="bi bi-x-circle"></i> Cancel
+        </button>
+      </div>
+    `;
+    
+    // Replace tags with input
+    tagsContainer.innerHTML = `<input type="text" id="editTags" class="form-control mb-3" placeholder="Add tags (comma separated)" value="${escapeHtml(originalTags.join(', '))}">`;
+    
+    // Replace edit button with smaller top buttons
+    const editBtn = qs('#editBtn');
+    if (editBtn) {
+      editBtn.parentElement.innerHTML = `
+        <div class="d-flex gap-2">
+          <small class="text-muted align-self-center">Currently Editing</small>
+        </div>
+      `;
+    }
+    
+    // Store post data for handlers (using a closure-safe approach)
+    // Make a deep copy to prevent reference issues
+    try {
+      if (post && post._id) {
+        window._currentEditPost = JSON.parse(JSON.stringify(post));
+        window._currentEditPostId = post._id;
+
+      } else {
+
+        // Try to get post ID from URL as fallback
+        const hash = location.hash || '';
+        const match = hash.match(/#\/post\/([^\/]+)/);
+        if (match && match[1]) {
+          window._currentEditPostId = match[1];
+
+        }
+      }
+    } catch (error) {
+
+      // Fallback: store at least the ID
+      if (post && post._id) {
+        window._currentEditPostId = post._id;
+      }
+    }
+    
+    // Verify buttons are created and inline handlers are set
+    // Inline onclick handlers in the HTML should handle clicks directly
+    requestAnimationFrame(() => {
+      const repostBtn = qs('#repostBtn');
+      const cancelEditBtn = qs('#cancelEditBtn');
+      
+      if (repostBtn) {
+
+        
+        // Ensure button is clickable
+        repostBtn.style.pointerEvents = 'auto';
+        repostBtn.style.cursor = 'pointer';
+        
+        // Add visual feedback on hover
+        repostBtn.addEventListener('mouseenter', () => {
+          repostBtn.style.transform = 'scale(1.05)';
+          repostBtn.style.transition = 'transform 0.2s ease';
+        });
+        repostBtn.addEventListener('mouseleave', () => {
+          repostBtn.style.transform = 'scale(1)';
+        });
+      } else {
+
+      }
+      
+      if (cancelEditBtn) {
+
+        cancelEditBtn.style.pointerEvents = 'auto';
+        cancelEditBtn.style.cursor = 'pointer';
+      }
+    });
+    
+    // Additional backup handlers (inline onclick should work, but this is a safety net)
+    setTimeout(() => {
+      const repostBtn = qs('#repostBtn');
+      const cancelEditBtn = qs('#cancelEditBtn');
+      
+      if (repostBtn) {
+
+        
+        // Add event listener as backup (inline handler should handle it, but this ensures it works)
+        if (!repostBtn.dataset.backupHandlerAttached) {
+          repostBtn.dataset.backupHandlerAttached = 'true';
+          repostBtn.addEventListener('click', function(e) {
+
+            e.stopPropagation();
+            if (window.handleRepostClick) {
+              window.handleRepostClick(e);
+            } else if (window._currentEditPost && window._currentEditPost._id) {
+              handleRepostButtonClick(window._currentEditPost);
+            }
+          }, false);
+        }
+      }
+      
+      if (cancelEditBtn && !cancelEditBtn.dataset.backupHandlerAttached) {
+        cancelEditBtn.dataset.backupHandlerAttached = 'true';
+        cancelEditBtn.addEventListener('click', function(e) {
+
+          e.stopPropagation();
+          if (window.handleCancelEdit) {
+            window.handleCancelEdit(e);
+          } else if (window._currentEditPost) {
+            exitEditMode(window._currentEditPost);
+          }
+        }, false);
+      }
+    }, 50);
+    
+    // Focus effect for the content editor
+    const editContent = qs('#editContent');
+    editContent.addEventListener('focus', () => {
+      editContent.style.borderColor = 'rgba(217, 119, 6, 0.4)';
+    });
+    editContent.addEventListener('blur', () => {
+      editContent.style.borderColor = 'var(--border)';
+    });
+    
+    // Try immediate attachment first
+
+    const immediateUpdateBtn = qs('#updateChangesBtn');
+    const immediateCancelBtn = qs('#cancelEditBtn');
+
+    
+    // Add event listeners directly to the buttons after DOM update
+
+    setTimeout(() => {
+
+      const updateBtn = qs('#updateChangesBtn');
+      const cancelBtn = qs('#cancelEditBtn');
+      
+
+      
+      // Debug: Check if buttons are in DOM
+      if (updateBtn) {
+
+      } else {
+
+
+      }
+      
+      if (updateBtn) {
+
+        
+        // Test if button is clickable
+        updateBtn.style.cursor = 'pointer';
+        updateBtn.style.border = '3px solid red';
+        
+        const clickHandler = async (e) => {
+
+          e.preventDefault();
+          e.stopPropagation();
+          
+          const newTitle = qs('#editTitle').value.trim();
+          const newContent = qs('#editContent').innerHTML.trim();
+          const newTags = qs('#editTags').value.split(',').map(t => t.trim()).filter(Boolean);
+          
+
+
+          if (!newTitle || !newContent) {
+            alert('Title and content are required');
+            return;
+          }
+          
+          try {
+            const originalBtnHtml = updateBtn.innerHTML;
+            updateBtn.disabled = true;
+            updateBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Updating Changes...';
+            
+            // Prepare the update payload
+            const updatePayload = {
+              title: newTitle,
+              content: newContent,
+              tags: newTags
+            };
+            
+            console.log('Sending update payload:', updatePayload);
+            
+            // Make the API call to update the EXISTING post
+            const response = await fetch(API_BASE + `/posts/${post._id}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + localStorage.getItem('accessToken')
+              },
+              body: JSON.stringify(updatePayload)
+            });
+
+            console.log('Response status:', response.status);
+            console.log('Response complete:', response);
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.error('Update failed. Response text:', errorText);
+              throw new Error(`Server error: ${response.status} - ${errorText}`);
+            }
+
+            const updatedPost = await response.json();
+            
+            console.log('=== UPDATE SUCCESS ===');
+            console.log('Updated post received from server:', updatedPost);
+            console.log('MongoDB ObjectId confirmed:', updatedPost._id);
+            console.log('EXISTING POST WAS UPDATED, NOT CREATED NEW');
+            
+            // Show beautiful success message
+            showSuccessMessage('Post Updated Successfully!', `Your post "${updatedPost.title}" has been updated and saved to the database.`);
+            
+            // Update the post object with new data
+            post.title = updatedPost.title;
+            post.content = updatedPost.content;
+            post.tags = updatedPost.tags || [];
+            
+            // Smoothly exit edit mode and display updated content
+            exitEditMode(post);
+            
+            console.log('✅ Post updated successfully without page reload');
+            
+          } catch (err) {
+            console.error('Error updating post:', err);
+            
+            // Show error message
+            showErrorMessage('Update Failed', `Failed to update post: ${err.message}`);
+            
+            // Reset button state
+            updateBtn.disabled = false;
+            updateBtn.innerHTML = originalBtnHtml;
+          }
+        };
+        
+        // Attach both onclick and addEventListener for maximum compatibility
+        updateBtn.onclick = clickHandler;
+        updateBtn.addEventListener('click', clickHandler);
+        
+        console.log('✅ Event handlers attached successfully');
+        
+        // Add a test button as backup
+        const testBtn = document.createElement('button');
+        testBtn.innerHTML = 'TEST CLICK';
+        testBtn.className = 'btn btn-warning btn-sm ms-2';
+        testBtn.onclick = () => {
+          console.log('🧪 TEST BUTTON CLICKED - Event system working!');
+          alert('Test button works!');
+        };
+        updateBtn.parentElement.appendChild(testBtn);
+        
+      } else {
+        console.error('❌ Update button not found after timeout!');
+        console.log('❌ Available buttons in DOM:', document.querySelectorAll('button'));
+      }
+      
+      if (cancelBtn) {
+        cancelBtn.onclick = () => {
+          const confirmed = confirm('Are you sure you want to cancel? Any unsaved changes will be lost.');
+          if (confirmed) {
+            renderPostView(post._id);
+          }
+        };
+      }
+      
+      console.log('⏰ Timeout completed, handlers should be attached');
+    }, 500); // Increased timeout to ensure DOM is ready
+  }
+
+  async function deletePost(post) {
+    // Show confirmation dialog
+    const confirmDelete = confirm(
+      `Are you sure you want to delete "${post.title}"?\n\nThis action cannot be undone and will also delete all comments on this post.`
+    );
+    
+    if (!confirmDelete) return;
+    
+    try {
+      await apiFetch(`/posts/${post._id}`, { method: 'DELETE' });
+      
+      // Show success message and redirect to home
+      alert('Post deleted successfully');
+      location.hash = '#/';
+    } catch (err) {
+      console.error(err);
+      if (err.status === 403) {
+        alert('You are not authorized to delete this post');
+      } else {
+        alert('Failed to delete post: ' + (err.body?.message || 'Unknown error'));
+      }
+    }
+  }
+
   function escapeHtml(s){ 
     if(s==null) return ''; 
     return String(s).replace(/[&<>"]+/g, function(c){ 
       return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; 
     }); 
+  }
+
+  function showSuccessMessage(title, message) {
+    // Remove any existing success messages
+    const existingMsg = qs('#successMessage');
+    if (existingMsg) existingMsg.remove();
+    
+    // Create success message element
+    const successDiv = document.createElement('div');
+    successDiv.id = 'successMessage';
+    successDiv.className = 'alert alert-success alert-dismissible fade show position-fixed';
+    successDiv.style.cssText = `
+      top: 20px; 
+      right: 20px; 
+      z-index: 9999; 
+      min-width: 350px; 
+      box-shadow: 0 8px 24px rgba(0,128,0,0.2);
+      border: none;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: white;
+    `;
+    
+    successDiv.innerHTML = `
+      <div class="d-flex align-items-center">
+        <i class="bi bi-check-circle-fill me-3" style="font-size: 1.5rem;"></i>
+        <div class="flex-grow-1">
+          <strong>${escapeHtml(title)}</strong>
+          <div style="font-size: 0.9rem; opacity: 0.9; margin-top: 0.25rem;">${escapeHtml(message)}</div>
+        </div>
+        <button type="button" class="btn-close btn-close-white" onclick="this.parentElement.parentElement.remove()"></button>
+      </div>
+    `;
+    
+    // Add to page
+    document.body.appendChild(successDiv);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+      if (successDiv.parentElement) {
+        successDiv.classList.remove('show');
+        setTimeout(() => successDiv.remove(), 300);
+      }
+    }, 5000);
+  }
+
+  function showErrorMessage(title, message) {
+    // Remove any existing error messages
+    const existingMsg = qs('#errorMessage');
+    if (existingMsg) existingMsg.remove();
+    
+    // Create error message element
+    const errorDiv = document.createElement('div');
+    errorDiv.id = 'errorMessage';
+    errorDiv.className = 'alert alert-danger alert-dismissible fade show position-fixed';
+    errorDiv.style.cssText = `
+      top: 20px; 
+      right: 20px; 
+      z-index: 9999; 
+      min-width: 350px; 
+      box-shadow: 0 8px 24px rgba(220,38,38,0.2);
+      border: none;
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      color: white;
+    `;
+    
+    errorDiv.innerHTML = `
+      <div class="d-flex align-items-center">
+        <i class="bi bi-exclamation-triangle-fill me-3" style="font-size: 1.5rem;"></i>
+        <div class="flex-grow-1">
+          <strong>${escapeHtml(title)}</strong>
+          <div style="font-size: 0.9rem; opacity: 0.9; margin-top: 0.25rem;">${escapeHtml(message)}</div>
+        </div>
+        <button type="button" class="btn-close btn-close-white" onclick="this.parentElement.parentElement.remove()"></button>
+      </div>
+    `;
+    
+    // Add to page
+    document.body.appendChild(errorDiv);
+    
+    // Auto-remove after 7 seconds (longer for errors)
+    setTimeout(() => {
+      if (errorDiv.parentElement) {
+        errorDiv.classList.remove('show');
+        setTimeout(() => errorDiv.remove(), 300);
+      }
+    }, 7000);
+  }
+
+  function handleRepostButtonClick(post) {
+    const contentElement = qs('#editContent');
+    const titleElement = qs('#editTitle');
+    
+    if (!contentElement) {
+      showErrorMessage('Error', 'Could not find post content');
+      return;
+    }
+
+    if (!titleElement) {
+      showErrorMessage('Error', 'Could not find post title');
+      return;
+    }
+
+    const editedContent = contentElement.innerHTML.trim();
+    const titleValue = titleElement.value || titleElement.textContent || '';
+    const editedTitle = titleValue.trim() || (post && post.title ? post.title : 'Untitled Post');
+    const editedTags = qs('#editTags') 
+      ? qs('#editTags').value.split(',').map(t => t.trim()).filter(Boolean) 
+      : (post && post.tags ? post.tags : []);
+
+    if (!editedContent) {
+      showErrorMessage('Validation Error', 'Content cannot be empty');
+      return;
+    }
+
+    if (!editedTitle) {
+      showErrorMessage('Validation Error', 'Title cannot be empty');
+      return;
+    }
+
+    // Show loading state
+    const repostBtn = qs('#repostBtn');
+    const originalBtnHtml = repostBtn ? repostBtn.innerHTML : '';
+    if (repostBtn) {
+      repostBtn.disabled = true;
+      repostBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Updating...';
+    }
+
+    if (!post || !post._id) {
+      showErrorMessage('Error', 'Cannot update post: post ID not found');
+      if (repostBtn) {
+        repostBtn.disabled = false;
+        repostBtn.innerHTML = originalBtnHtml;
+      }
+      return;
+    }
+    
+    if (!post._id || post._id === 'unknown' || post._id === 'undefined') {
+      showErrorMessage('Error', 'Invalid post ID. Cannot update post.');
+      if (repostBtn) {
+        repostBtn.disabled = false;
+        repostBtn.innerHTML = originalBtnHtml;
+      }
+      return;
+    }
+    
+    const updateUrl = `${API_BASE}/posts/${encodeURIComponent(post._id)}`;
+    
+    const updatePayload = {
+      title: editedTitle,
+      content: editedContent,
+      tags: editedTags
+    };
+    
+    const requestOptions = {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+      },
+      body: JSON.stringify(updatePayload)
+    };
+    
+    fetch(updateUrl, requestOptions)
+    .then(response => {
+      if (!response.ok) {
+        return response.json().then(err => {
+          throw new Error(err.message || `HTTP error! status: ${response.status}`);
+        }).catch(parseError => {
+          return response.text().then(text => {
+            throw new Error(`Server error: ${response.status} - ${text}`);
+          });
+        });
+      }
+      
+      return response.json();
+    })
+    .then(data => {
+      showSuccessMessage('Post Updated!', `Your post "${data.title}" has been updated successfully.`);
+      
+      if (post) {
+        post.title = data.title;
+        post.content = data.content;
+        post.tags = data.tags || [];
+        if (data._id) {
+          post._id = data._id;
+        }
+      }
+      
+      exitEditMode(post);
+    })
+    .catch(error => {
+      showErrorMessage('Update Failed', error.message || 'Failed to update post. Please try again.');
+      
+      if (repostBtn) {
+        repostBtn.disabled = false;
+        repostBtn.innerHTML = originalBtnHtml;
+      }
+    });
+  }
+
+  function exitEditMode(post) {
+    // Get the updated content with DOMPurify sanitization
+    const safeHtml = DOMPurify.sanitize(post.content || '');
+    
+    // Restore the post title
+    const postTitle = qs('.post-title');
+    if (postTitle) {
+      postTitle.innerHTML = escapeHtml(post.title);
+    }
+    
+    // Restore the post content
+    const postContent = qs('#postContent');
+    if (postContent) {
+      postContent.innerHTML = safeHtml;
+    }
+    
+    // Restore the tags
+    const tagsContainer = postTitle.parentElement.parentElement.querySelector('.mb-3');
+    if (tagsContainer && post.tags) {
+      tagsContainer.innerHTML = post.tags.map(t => `<span class="tag">${escapeHtml(t)}</span>`).join(' ');
+    }
+    
+    // Restore the edit buttons
+    const editButtonContainer = qs('.post-title').parentElement.querySelector('.d-flex');
+    if (editButtonContainer) {
+      editButtonContainer.innerHTML = `
+        <div class="d-flex gap-2">
+          <button id="editBtn" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-pencil" style="font-size: 14px;"></i> Edit
+          </button>
+          <button id="deleteBtn" class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-trash" style="font-size: 14px;"></i> Delete
+          </button>
+        </div>
+      `;
+      
+      // Re-attach event listeners
+      qs('#editBtn').onclick = () => toggleEditMode(post);
+      qs('#deleteBtn').onclick = () => deletePost(post);
+    }
   }
 
   function formatDate(dateStr){

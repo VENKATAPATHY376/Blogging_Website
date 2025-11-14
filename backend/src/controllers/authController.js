@@ -19,7 +19,7 @@ export const register = async (req, res) => {
     const user = new User({ username, email, password: hashed });
     await user.save();
     const token = jwt.sign({ id: user._id, username: user.username }, process.env.JWT_SECRET, { expiresIn: '2d' });
-    const safeUser = { id: user._id, username: user.username, email: user.email };
+    const safeUser = { _id: user._id, id: user._id, username: user.username, email: user.email, displayName: user.username };
     res.json({ accessToken: token, user: safeUser });
   } catch (err) {
     console.error('Register error:', err);
@@ -41,7 +41,7 @@ export const login = async (req, res) => {
     if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
 
     const token = jwt.sign({ id: user._id, username: user.username }, process.env.JWT_SECRET, { expiresIn: '2d' });
-    const safeUser = { id: user._id, username: user.username, email: user.email };
+    const safeUser = { _id: user._id, id: user._id, username: user.username, email: user.email, displayName: user.username };
     res.json({ accessToken: token, user: safeUser });
   } catch (err) {
     console.error('Login error:', err);

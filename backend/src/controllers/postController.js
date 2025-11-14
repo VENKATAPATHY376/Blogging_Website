@@ -19,11 +19,27 @@ export const getPosts = async (req, res) => {
 };
 
 export const getPostById = async (req, res) => {
-  const post = await Post.findById(req.params.id).populate('author', 'username');
-  if(!post) return res.status(404).json({ message: 'Post not found' });
-  const commentsRaw = await Comment.find({ postId: req.params.id }).populate('userId', 'username').sort({ createdAt: -1 });
-  const comments = commentsRaw.map(c => ({ _id: c._id, content: c.content, createdAt: c.createdAt, author: { username: c.userId?.username } }));
-  res.json({ post, comments });
+  try {
+    const post = await Post.findById(req.params.id).populate('author', 'username email');
+    if(!post) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+
+    const commentsRaw = await Comment.find({ postId: req.params.id }).populate('userId', 'username').sort({ createdAt: -1 });
+    const comments = commentsRaw.map(c => ({ 
+      _id: c._id, 
+      content: c.content, 
+      createdAt: c.createdAt, 
+      author: { 
+        username: c.userId?.username,
+        _id: c.userId?._id
+      } 
+    }));
+
+    res.json({ post, comments });
+  } catch (error) {
+    res.status(500).json({ message: 'Internal server error' });
+  }
 };
 
 export const likePost = async (req, res) => {
@@ -50,6 +66,93 @@ export const dislikePost = async (req, res) => {
   }
   await post.save();
   res.json(post);
+};
+
+export const updatePost = async (req, res) => {
+  try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    const post = await Post.findById(req.params.id).populate('author', 'username email');
+    if (!post) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+
+    const postAuthorId = post.author._id.toString();
+    const currentUserId = req.user.id.toString();
+
+    if (postAuthorId !== currentUserId) {
+      return res.status(403).json({ 
+        message: 'You can only edit your own posts',
+        postAuthor: post.author.username,
+        currentUser: req.user.username
+      });
+    }
+
+    const { title, content, tags } = req.body;
+    
+    if (title !== undefined) {
+      post.title = title;
+    }
+    
+    if (content !== undefined) {
+      post.content = content;
+    }
+    
+    if (tags !== undefined) {
+      post.tags = tags;
+    }
+
+    post.markModified('title');
+    post.markModified('content');
+    post.markModified('tags');
+    
+    const savedPost = await post.save({ validateBeforeSave: true });
+    await savedPost.populate('author', 'username');
+    
+    res.json(savedPost);
+  } catch (error) {
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+export const deletePost = async (req, res) => {
+  try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    const post = await Post.findById(req.params.id).populate('author', 'username email');
+    if (!post) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+
+    const postAuthorId = post.author._id.toString();
+    const currentUserId = req.user.id.toString();
+
+    if (postAuthorId !== currentUserId) {
+      return res.status(403).json({ 
+        message: 'You can only delete your own posts',
+        postAuthor: post.author.username,
+        currentUser: req.user.username
+      });
+    }
+
+    const commentDeleteResult = await Comment.deleteMany({ postId: req.params.id });
+    await Post.findByIdAndDelete(req.params.id);
+    
+    res.json({ 
+      message: 'Post deleted successfully',
+      deletedPost: {
+        id: post._id,
+        title: post.title
+      },
+      deletedComments: commentDeleteResult.deletedCount
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Internal server error' });
+  }
 };
 
 export const getTags = async (req, res) => {
