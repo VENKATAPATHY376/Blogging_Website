@@ -3,7 +3,6 @@ name: Deploy Frontend to GitHub Pages
 on:
   push:
     branches: [ main ]
-    paths: [ 'frontend/**' ]  # Only deploy when frontend changes
   workflow_dispatch:  # Allow manual trigger
 
 permissions:

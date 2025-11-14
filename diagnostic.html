@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Pages Diagnostic</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+            background: #f8f9fa;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status-good { color: #059669; }
+        .status-bad { color: #dc2626; }
+        .status-warning { color: #d97706; }
+        pre {
+            background: #f3f4f6;
+            padding: 1rem;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        button {
+            background: #d97706;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 0.5rem;
+        }
+        button:hover {
+            background: #b45309;
+        }
+    </style>
+</head>
+<body>
+    <h1>📊 GitHub Pages Deployment Diagnostic</h1>
+    
+    <div class="card">
+        <h3>🌐 Current Environment</h3>
+        <div id="environment-info">
+            <p><strong>Host:</strong> <span id="current-host"></span></p>
+            <p><strong>URL:</strong> <span id="current-url"></span></p>
+            <p><strong>Protocol:</strong> <span id="current-protocol"></span></p>
+            <p><strong>Path:</strong> <span id="current-path"></span></p>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>🔗 API Connection Test</h3>
+        <p><strong>Backend URL:</strong> <span id="api-url"></span></p>
+        <button onclick="testApiConnection()">Test Connection</button>
+        <button onclick="testApiHealth()">Test Health Endpoint</button>
+        <div id="api-results" style="margin-top: 1rem;"></div>
+    </div>
+
+    <div class="card">
+        <h3>📂 File Structure Test</h3>
+        <button onclick="testFrontendAccess()">Test Frontend Access</button>
+        <button onclick="testAssets()">Test Assets</button>
+        <div id="file-results" style="margin-top: 1rem;"></div>
+    </div>
+
+    <div class="card">
+        <h3>🔧 Quick Actions</h3>
+        <a href="./frontend/" style="text-decoration: none;">
+            <button>🚀 Go to Main App</button>
+        </a>
+        <a href="./frontend/index.html" style="text-decoration: none;">
+            <button>📄 Direct Frontend Link</button>
+        </a>
+        <a href="https://github.com/VENKATAPATHY376/Blogging_Website/actions" target="_blank" style="text-decoration: none;">
+            <button>⚡ View GitHub Actions</button>
+        </a>
+        <a href="https://github.com/VENKATAPATHY376/Blogging_Website/settings/pages" target="_blank" style="text-decoration: none;">
+            <button>⚙️ GitHub Pages Settings</button>
+        </a>
+    </div>
+
+    <div class="card">
+        <h3>📋 Diagnostic Results</h3>
+        <pre id="diagnostic-log"></pre>
+    </div>
+
+    <script>
+        // Initialize diagnostic information
+        document.getElementById('current-host').textContent = window.location.hostname;
+        document.getElementById('current-url').textContent = window.location.href;
+        document.getElementById('current-protocol').textContent = window.location.protocol;
+        document.getElementById('current-path').textContent = window.location.pathname;
+
+        const API_BASE = 'https://blogging-website-qvl8.onrender.com/api';
+        document.getElementById('api-url').textContent = API_BASE;
+
+        let diagnosticLog = [];
+
+        function log(message, status = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${status.toUpperCase()}: ${message}`;
+            diagnosticLog.push(logEntry);
+            document.getElementById('diagnostic-log').textContent = diagnosticLog.join('\\n');
+            console.log(logEntry);
+        }
+
+        log('Diagnostic page loaded successfully');
+
+        async function testApiConnection() {
+            const resultsDiv = document.getElementById('api-results');
+            resultsDiv.innerHTML = '<p>🔄 Testing API connection...</p>';
+            log('Starting API connection test');
+
+            try {
+                const response = await fetch(API_BASE + '/posts?limit=1', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    resultsDiv.innerHTML = `<p class="status-good">✅ API Connection: SUCCESS</p><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    log('API connection test passed', 'success');
+                } else {
+                    resultsDiv.innerHTML = `<p class="status-bad">❌ API Connection: FAILED (${response.status})</p>`;
+                    log(`API connection failed with status ${response.status}`, 'error');
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `<p class="status-bad">❌ API Connection: ERROR</p><pre>${error.message}</pre>`;
+                log(`API connection error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testApiHealth() {
+            const resultsDiv = document.getElementById('api-results');
+            log('Testing API health endpoint');
+
+            try {
+                const response = await fetch(API_BASE + '/health');
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    resultsDiv.innerHTML = `<p class="status-good">✅ Health Check: SUCCESS</p><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    log('API health check passed', 'success');
+                } else {
+                    resultsDiv.innerHTML = `<p class="status-warning">⚠️ Health endpoint not found, trying root...</p>`;
+                    log('Health endpoint not found, testing root', 'warning');
+                    
+                    // Try root endpoint
+                    const rootResponse = await fetch('https://blogging-website-qvl8.onrender.com/');
+                    const rootText = await rootResponse.text();
+                    resultsDiv.innerHTML += `<p class="status-good">✅ Root endpoint: ${rootResponse.status}</p><pre>${rootText.substring(0, 200)}...</pre>`;
+                    log('Root endpoint accessible', 'success');
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `<p class="status-bad">❌ Health Check: ERROR</p><pre>${error.message}</pre>`;
+                log(`Health check error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testFrontendAccess() {
+            const resultsDiv = document.getElementById('file-results');
+            resultsDiv.innerHTML = '<p>🔄 Testing frontend access...</p>';
+            log('Testing frontend file access');
+
+            try {
+                const response = await fetch('./frontend/index.html');
+                
+                if (response.ok) {
+                    const html = await response.text();
+                    const hasBootstrap = html.includes('bootstrap');
+                    const hasQuill = html.includes('quill');
+                    
+                    resultsDiv.innerHTML = `
+                        <p class="status-good">✅ Frontend HTML: Accessible</p>
+                        <p>Bootstrap CSS: ${hasBootstrap ? '✅' : '❌'}</p>
+                        <p>Quill Editor: ${hasQuill ? '✅' : '❌'}</p>
+                        <p>HTML Length: ${html.length} characters</p>
+                    `;
+                    log('Frontend files accessible', 'success');
+                } else {
+                    resultsDiv.innerHTML = `<p class="status-bad">❌ Frontend access failed: ${response.status}</p>`;
+                    log(`Frontend access failed: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `<p class="status-bad">❌ Frontend test error: ${error.message}</p>`;
+                log(`Frontend test error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testAssets() {
+            const resultsDiv = document.getElementById('file-results');
+            log('Testing asset access');
+
+            try {
+                // Test if we can access static assets
+                const testUrls = [
+                    './frontend/assets/',
+                    './frontend/js/',
+                    './frontend/package.json'
+                ];
+
+                let results = '<h4>Asset Test Results:</h4>';
+                
+                for (const url of testUrls) {
+                    try {
+                        const response = await fetch(url);
+                        const status = response.ok ? '✅' : '❌';
+                        results += `<p>${status} ${url}: ${response.status}</p>`;
+                        log(`Asset test ${url}: ${response.status}`, response.ok ? 'success' : 'warning');
+                    } catch (err) {
+                        results += `<p>❌ ${url}: Error</p>`;
+                        log(`Asset test ${url}: Error`, 'error');
+                    }
+                }
+
+                resultsDiv.innerHTML = results;
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<p class="status-bad">❌ Asset test error: ${error.message}</p>`;
+                log(`Asset test error: ${error.message}`, 'error');
+            }
+        }
+
+        // Run initial tests
+        setTimeout(() => {
+            log('Running automatic diagnostics...');
+            testApiHealth();
+        }, 1000);
+    </script>
+</body>
+</html>
