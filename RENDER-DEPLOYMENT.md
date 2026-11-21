@@ -41,6 +41,8 @@ MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/blogdb
 MONGO_DB_NAME=blogdb
 JWT_SECRET=your_super_secure_jwt_secret_here_minimum_32_characters
 CORS_ORIGIN=https://your-frontend-domain.netlify.app
+# Optional: comma-separated list if you have multiple frontends
+ALLOWED_ORIGINS=https://VENKATAPATHY376.github.io,https://another.netlify.app
 NODE_ENV=production
 
 # Optional: For enhanced security
@@ -171,9 +173,11 @@ Then restart the service. `/api/health` should report `"dbName":"blogdb"`.
 ### Issue 3: CORS Errors
 **Error**: `Access-Control-Allow-Origin`
 **Solution**: 
-- Ensure CORS_ORIGIN matches frontend URL exactly
-- No trailing slash in CORS_ORIGIN
-- Include https:// protocol
+- Matching is now case-insensitive and ignores a trailing slash
+- `*.netlify.app`, `*.onrender.com`, and `venkatapathy376.github.io` are allowed automatically
+- For other domains, set `CORS_ORIGIN` or a comma-separated `ALLOWED_ORIGINS`
+- Always include `https://`
+- A rejected origin now returns `403 Origin not allowed by CORS` instead of a misleading `500`
 
 ### Issue 4: JWT Secret Issues
 **Error**: `secretOrPrivateKey has a minimum key size`

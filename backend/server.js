@@ -25,21 +25,37 @@ const corsOptions = {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
-    // Define allowed origins
+    // Origins are case-insensitive and may include a trailing slash.
+    const normalize = (value) => value.trim().toLowerCase().replace(/\/$/, '');
     const allowedOrigins = [
       'http://localhost:3000',
       'http://127.0.0.1:3000',
       'http://localhost:3001',
       'https://blogeweb.netlify.app',
-      'https://venkatpathy376.github.io',
-      process.env.CORS_ORIGIN
-    ].filter(Boolean);
-    
-    if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
-      return callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+      'https://venkatapathy376.github.io',
+      process.env.CORS_ORIGIN,
+      ...(process.env.ALLOWED_ORIGINS || '').split(',').filter(Boolean)
+    ].filter(Boolean).map(normalize);
+
+    const normalizedOrigin = normalize(origin);
+
+    let hostname = '';
+    try {
+      hostname = new URL(normalizedOrigin).hostname;
+    } catch {
+      return callback(new Error('Not allowed by CORS'));
     }
+
+    const isAllowed =
+      allowedOrigins.includes(normalizedOrigin) ||
+      hostname === 'venkatapathy376.github.io' ||
+      hostname.endsWith('.netlify.app') ||
+      hostname.endsWith('.onrender.com');
+
+    if (isAllowed || process.env.NODE_ENV === 'development') {
+      return callback(null, true);
+    }
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true
 };
@@ -101,6 +117,9 @@ app.get('*', (req, res, next) => {
 // express error handler
 app.use((err, req, res, next) => {
 	console.error('Request error:', err.message);
+	if (err.message === 'Not allowed by CORS') {
+		return res.status(403).json({ message: 'Origin not allowed by CORS' });
+	}
 	res.status(500).json({ message: 'Internal server error' });
 });
 
