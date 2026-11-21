@@ -38,6 +38,7 @@ Add these in the **"Advanced"** section:
 # Required Environment Variables
 # Do NOT set PORT manually - Render injects the correct PORT automatically.
 MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/blogdb
+MONGO_DB_NAME=blogdb
 JWT_SECRET=your_super_secure_jwt_secret_here_minimum_32_characters
 CORS_ORIGIN=https://your-frontend-domain.netlify.app
 NODE_ENV=production
@@ -151,6 +152,21 @@ The updated server binds its port first and exposes `GET /api/health`. A `503` r
 - Confirm the Atlas database user has read/write access to the database in the URI
 
 After fixing the variable, restart the Render service. `/api/health` should then return `200 OK`.
+
+### Issue 4: Login fails on the deployed site but works locally
+**Cause**: `MONGO_URI` omits the database name, so Mongoose connects to MongoDB's default `test` database and your users are missing.
+
+**Check**:
+
+```bash
+curl https://blogging-website-qvl8.onrender.com/api/health
+```
+
+If `dbName` is `test`, fix it by either:
+- adding `/blogdb` to `MONGO_URI`, or
+- setting `MONGO_DB_NAME=blogdb` in Render **Environment**
+
+Then restart the service. `/api/health` should report `"dbName":"blogdb"`.
 
 ### Issue 3: CORS Errors
 **Error**: `Access-Control-Allow-Origin`

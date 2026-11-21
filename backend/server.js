@@ -60,7 +60,8 @@ app.get('/api/health', (req, res) => {
   const states = ['DISCONNECTED', 'CONNECTED', 'CONNECTING', 'DISCONNECTING'];
   res.status(mongoose.connection.readyState === 1 ? 200 : 503).json({
     status: mongoose.connection.readyState === 1 ? 'ok' : 'unavailable',
-    database: states[mongoose.connection.readyState] || 'UNKNOWN'
+    database: states[mongoose.connection.readyState] || 'UNKNOWN',
+    dbName: mongoose.connection.name || null
   });
 });
 

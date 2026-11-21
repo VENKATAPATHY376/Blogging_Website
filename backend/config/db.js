@@ -12,6 +12,8 @@ const connectDB = async () => {
 
   await mongoose.connect(process.env.MONGO_URI, {
     serverSelectionTimeoutMS: 10000,
+    // Use an explicit DB name so a URI without "/blogdb" does not default to "test".
+    dbName: process.env.MONGO_DB_NAME || 'blogdb',
   });
 
   mongoose.connection.on('disconnected', () => {
