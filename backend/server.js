@@ -64,6 +64,18 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Do not let DB-dependent routes run while MongoDB is unavailable.
+// This prevents Mongoose buffering timeouts and unhandled rejections.
+app.use('/api', (req, res, next) => {
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({
+      message: 'Database unavailable',
+      database: 'DISCONNECTED'
+    });
+  }
+  next();
+});
+
 // Routes
 app.use('/api', authRoutes);
 app.use('/api/posts', postRoutes);
@@ -87,6 +99,7 @@ app.get('*', (req, res, next) => {
 
 // express error handler
 app.use((err, req, res, next) => {
+	console.error('Request error:', err.message);
 	res.status(500).json({ message: 'Internal server error' });
 });
 
@@ -138,5 +151,10 @@ const shutdown = (signal) => {
 
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
+
+// Safety net: an async route that misses a catch should not crash the service.
+process.on('unhandledRejection', (reason) => {
+	console.error('Unhandled promise rejection:', reason?.message || reason);
+});
 
 start();

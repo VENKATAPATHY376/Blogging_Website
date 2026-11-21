@@ -142,6 +142,16 @@ curl -X POST https://your-backend.onrender.com/api/users/register \
 
 The updated server binds its port first and exposes `GET /api/health`. A `503` response with `"database": "DISCONNECTED"` means MongoDB is still the problem.
 
+### Issue 3: `bad auth : authentication failed`
+**Cause**: The `MONGO_URI` in Render has the wrong username/password (or a password that needs URL-encoding).
+
+**Solutions**:
+- Copy the exact working connection string from local `backend/.env` into Render **Environment > MONGO_URI**
+- If the password contains special characters, URL-encode them (`@` → `%40`, `#` → `%23`, etc.)
+- Confirm the Atlas database user has read/write access to the database in the URI
+
+After fixing the variable, restart the Render service. `/api/health` should then return `200 OK`.
+
 ### Issue 3: CORS Errors
 **Error**: `Access-Control-Allow-Origin`
 **Solution**: 

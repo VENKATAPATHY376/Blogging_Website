@@ -1,5 +1,8 @@
 import mongoose from 'mongoose';
 
+// Fail fast instead of buffering queries for 10s when MongoDB is unavailable.
+mongoose.set('bufferCommands', false);
+
 const connectDB = async () => {
   if (!process.env.MONGO_URI) {
     throw new Error(
