@@ -1,17 +1,21 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
+import mongoose from 'mongoose';
 import connectDB from './config/db.js';
 import authRoutes from './src/routes/authroutes.js';
 import postRoutes from './src/routes/postRoutes.js';
 import commentRoutes from './src/routes/commentroutes.js';
 import uploadRoutes from './src/routes/uploadRoutes.js';
+import aiRoutes from './src/routes/aiRoutes.js';
+import monetizationRoutes from './src/routes/monetizationRoutes.js';
+import schedulerService from './src/services/schedulerService.js';
 
 dotenv.config();
 
 console.log('Starting server...');
 
-// connectDB returns a promise; start the server only after DB connected
+// The HTTP server starts immediately; MongoDB connects in the background.
 const app = express();
 app.use(express.json());
 
@@ -26,8 +30,10 @@ const corsOptions = {
       'http://localhost:3000',
       'http://127.0.0.1:3000',
       'http://localhost:3001',
-      'https://blogeweb.netlify.app'
-    ];
+      'https://blogeweb.netlify.app',
+      'https://venkatpathy376.github.io',
+      process.env.CORS_ORIGIN
+    ].filter(Boolean);
     
     if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
       return callback(null, true);
@@ -49,10 +55,21 @@ const __dirname = path.dirname(__filename);
 const frontendPath = path.join(__dirname, '..', 'frontend');
 app.use(express.static(frontendPath));
 
+// Health check for Render / uptime monitoring
+app.get('/api/health', (req, res) => {
+  const states = ['DISCONNECTED', 'CONNECTED', 'CONNECTING', 'DISCONNECTING'];
+  res.status(mongoose.connection.readyState === 1 ? 200 : 503).json({
+    status: mongoose.connection.readyState === 1 ? 'ok' : 'unavailable',
+    database: states[mongoose.connection.readyState] || 'UNKNOWN'
+  });
+});
+
 // Routes
 app.use('/api', authRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/comments', commentRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/monetization', monetizationRoutes);
 
 const PORT = process.env.PORT || 4000;
 
@@ -73,25 +90,53 @@ app.use((err, req, res, next) => {
 	res.status(500).json({ message: 'Internal server error' });
 });
 
-// start the server after DB connection is established
+// Bind the port immediately so Render can detect the service, then connect to MongoDB.
+const server = app.listen(PORT, () => {
+	console.log(`Server running on port ${PORT}`);
+});
+
+server.on('error', (err) => {
+	console.error('Server error:', err.message);
+	process.exit(1);
+});
+
 const start = async () => {
 	try {
 		console.log('Connecting to database...');
 		await connectDB();
 		console.log('Database connected');
-		
-		const server = app.listen(PORT, () => {
-			console.log(`Server running on port ${PORT}`);
-		});
-		
-		server.on('error', (err) => {
-			console.error('Server error:', err.message);
-			process.exit(1);
-		});
+
+		// Initialize scheduler service
+		try {
+			console.log('Initializing smart scheduling service...');
+			schedulerService.init();
+			console.log('Smart scheduling service initialized');
+		} catch (schedulerError) {
+			console.warn('Warning: Failed to initialize scheduler service:', schedulerError.message);
+			console.log('Server will continue without smart scheduling feature');
+		}
 	} catch (err) {
-		console.error('Failed to start:', err.message);
-		process.exit(1);
+		// Do not exit: the port stays open so Render keeps the service alive.
+		// /api/health will report the DB as unavailable until it is fixed.
+		console.error('Database connection failed:', err.message);
+		console.warn('Server is running, but database-backed routes will fail until MongoDB is reachable.');
 	}
 };
+
+const shutdown = (signal) => {
+	console.log(`\nReceived ${signal}. Shutting down gracefully...`);
+	try {
+		schedulerService.stop();
+	} catch (err) {
+		console.warn('Could not stop scheduler:', err.message);
+	}
+	server.close(() => {
+		console.log('Server closed');
+		process.exit(0);
+	});
+};
+
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 start();

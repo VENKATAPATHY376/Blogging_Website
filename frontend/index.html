@@ -171,6 +171,8 @@
       border: 1px solid var(--border);
       height: 100%;
       cursor: pointer;
+      display: flex;
+      flex-direction: column;
     }
 
     .post-card:hover {
@@ -181,6 +183,9 @@
 
     .card-body {
       padding: 1.5rem;
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
     }
 
     /* Posts grid to match sample layout */
@@ -204,6 +209,7 @@
       height: 200px;
       overflow: hidden;
       background: #f3f4f6;
+      flex-shrink: 0;
     }
 
     .post-image img {
@@ -228,9 +234,11 @@
     }
 
     .card-footer .author-area {
-      display:flex;
-      align-items:center;
-      gap:0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex: 1;
+      min-width: 0; /* Allow text to truncate if needed */
     }
 
     .author-avatar.small {
@@ -243,6 +251,7 @@
       color: var(--text-primary);
       margin-bottom: 0.75rem;
       line-height: 1.4;
+      flex-shrink: 0;
     }
 
     .post-meta {
@@ -265,6 +274,7 @@
       font-size: 0.95rem;
       margin-bottom: 1rem;
       line-height: 1.6;
+      flex-grow: 1;
     }
 
     .tag {
@@ -294,6 +304,8 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      margin-top: auto;
+      flex-shrink: 0;
     }
 
     .stat-item {
@@ -321,29 +333,55 @@
       border-color: rgba(217, 119, 6, 0.4);
     }
 
-    .editor-toolbar {
-      background: var(--light-bg);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 0.5rem;
-      margin-bottom: 1rem;
-      display: flex;
-      gap: 0.5rem;
+    /* Enhanced Quill Editor Styling */
+    .ql-toolbar {
+      border: 2px solid #e9ecef !important;
+      border-radius: 12px 12px 0 0 !important;
+      background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%) !important;
+      padding: 12px 16px !important;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
     }
-
-    .editor-btn {
-      background: white;
-      border: 1px solid var(--border);
-      padding: 0.5rem 0.75rem;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: all 0.2s ease;
+    
+    .ql-container {
+      border: 2px solid #e9ecef !important;
+      border-top: none !important;
+      border-radius: 0 0 12px 12px !important;
+      font-family: 'Segoe UI', system-ui, sans-serif !important;
+      font-size: 16px !important;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
     }
-
-    .editor-btn:hover {
-      background: var(--primary);
-      color: white;
-      border-color: var(--primary);
+    
+    .ql-editor {
+      min-height: 300px !important;
+      padding: 20px !important;
+      line-height: 1.6 !important;
+      color: #2c3e50 !important;
+    }
+    
+    .ql-editor.ql-blank::before {
+      color: #6c757d !important;
+      font-style: italic !important;
+      font-size: 15px !important;
+    }
+    
+    .ql-toolbar .ql-formats {
+      margin-right: 12px !important;
+    }
+    
+    .ql-toolbar button:hover,
+    .ql-toolbar button:focus {
+      color: #007bff !important;
+    }
+    
+    .ql-toolbar button.ql-active {
+      background: #007bff !important;
+      color: white !important;
+      border-radius: 4px !important;
+    }
+    
+    .ql-toolbar .ql-picker-label:hover,
+    .ql-toolbar .ql-picker-label.ql-active {
+      color: #007bff !important;
     }
 
     /* Single Post View */
@@ -610,6 +648,12 @@
           <li class="nav-item"><a class="nav-link" href="#/">Home</a></li>
           <li class="nav-item"><a class="nav-link" href="#/editor">Write</a></li>
           <li class="nav-item" id="myPostsNav" style="display:none;"><a class="nav-link" href="#/my-posts">My Posts</a></li>
+          <li class="nav-item" id="monetizationNav" style="display:none;">
+            <a class="nav-link" href="#/monetization">
+              <i class="bi bi-cash-coin"></i> Earnings
+              <span id="liveEarningsCounter" class="badge bg-success ms-1" style="display:none;">$0.00</span>
+            </a>
+          </li>
         </ul>
         <div class="d-flex align-items-center">
           <div id="auth-area"></div>
@@ -659,6 +703,7 @@
       const id = hash.split('/')[2];
       renderPostView(id);
     } else if(hash.startsWith('#/my-posts')) renderMyPostsView();
+    else if(hash.startsWith('#/monetization')) renderMonetizationView();
     else if(hash.startsWith('#/login')) renderLoginView();
     else renderHomeView();
     renderAuthArea();
@@ -673,9 +718,11 @@
   function renderAuthArea(){
     const el = qs('#auth-area');
     const myPostsNav = qs('#myPostsNav');
+    const monetizationNav = qs('#monetizationNav');
     const user = JSON.parse(localStorage.getItem('me') || 'null');
     if(user){
       myPostsNav.style.display = 'block';
+      monetizationNav.style.display = 'block';
       el.innerHTML = `
         <div class="d-flex align-items-center gap-3">
           <div class="text-end d-none d-md-block">
@@ -694,6 +741,7 @@
       };
     } else {
       myPostsNav.style.display = 'none';
+      monetizationNav.style.display = 'none';
       el.innerHTML = `<a class="btn btn-primary" href="#/login"><i class="bi bi-person-circle"></i> Sign In</a>`;
     }
   }
@@ -722,8 +770,11 @@
             <div class="col-lg-5 d-none d-lg-block">
               <!-- Decorative feature panel -->
               <div style="background:rgba(255,255,255,0.06);border-radius:12px;padding:1.25rem;border:1px solid rgba(255,255,255,0.04);">
-                <h6 style="color:#fff;opacity:0.9;margin-bottom:0.75rem;">Trending this week</h6>
-                <div id="trendingTags" style="display:flex;flex-direction:column;gap:8px;color:rgba(255,255,255,0.95);"></div>
+                <h6 style="color:#fff;opacity:0.9;margin-bottom:0.75rem;display:flex;align-items:center;gap:8px;">
+                  <i class="bi bi-fire" style="color:#ff6b6b;"></i>
+                  Top Posts This Week
+                </h6>
+                <div id="trendingTags" style="display:flex;flex-direction:column;color:rgba(255,255,255,0.95);"></div>
               </div>
             </div>
           </div>
@@ -786,17 +837,63 @@
     });
     load();
 
-    // fetch tags for trending/topics and wire interactions
-    (async function loadTags(){
+    // Load trending posts and tags
+    (async function loadTrendingAndTags(){
       try{
-        const tags = await apiFetch('/posts/tags/all');
+        // Load trending posts based on likes
+        const trendingPosts = await apiFetch('/posts?page=1&limit=3&sortBy=likes');
         const trendingEl = qs('#trendingTags');
+        
+        if(trendingPosts && trendingPosts.items && trendingPosts.items.length){
+          trendingEl.innerHTML = trendingPosts.items.map(post => {
+            const likesCount = (post.likes && post.likes.length) || 0;
+            const title = post.title || 'Untitled';
+            const truncatedTitle = title.length > 35 ? title.substring(0, 35) + '...' : title;
+            
+            return `
+              <div class="trending-post-item" data-post-id="${escapeHtml(post._id)}" style="cursor: pointer; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1); transition: all 0.2s;">
+                <div class="d-flex justify-content-between align-items-center">
+                  <div class="flex-grow-1">
+                    <div class="text-white fw-medium" style="font-size: 0.9rem; line-height: 1.3;">
+                      ${escapeHtml(truncatedTitle)}
+                    </div>
+                    <div class="text-white-50" style="font-size: 0.8rem;">
+                      <i class="bi bi-heart-fill text-danger"></i> ${likesCount} likes
+                    </div>
+                  </div>
+                  <i class="bi bi-arrow-right text-white-50" style="font-size: 0.8rem;"></i>
+                </div>
+              </div>
+            `;
+          }).join('');
+          
+          // Wire click events for trending posts
+          qsa('.trending-post-item').forEach(item => {
+            item.addEventListener('click', () => {
+              const postId = item.dataset.postId;
+              location.hash = '#/post/' + postId;
+            });
+            
+            // Hover effects
+            item.addEventListener('mouseenter', (e) => {
+              e.target.style.backgroundColor = 'rgba(255,255,255,0.1)';
+              e.target.style.borderRadius = '8px';
+            });
+            item.addEventListener('mouseleave', (e) => {
+              e.target.style.backgroundColor = 'transparent';
+              e.target.style.borderRadius = '0';
+            });
+          });
+        } else {
+          trendingEl.innerHTML = '<div class="text-white-50" style="font-size: 0.9rem;">No trending posts yet</div>';
+        }
+        
+        // Load tags for topics dropdown
+        const tags = await apiFetch('/posts/tags/all');
         const topicsEl = qs('#topicsList');
         if(tags && tags.length){
-          trendingEl.innerHTML = tags.slice(0,6).map(t=>`<a href="#" class="text-white" data-tag="${escapeHtml(t)}" style="text-decoration:none">• ${escapeHtml(t)}</a>`).join('');
           topicsEl.innerHTML = tags.map(t=>`<button class="btn btn-sm m-1" data-tag="${escapeHtml(t)}" style="background: rgba(217, 119, 6, 0.08); color: #b45309; border: 1px solid rgba(217, 119, 6, 0.15); border-radius: 999px; padding: 0.4rem 1rem; font-weight: 600; font-size: 0.85rem; transition: all 0.2s;">${escapeHtml(t)}</button>`).join('');
-          // wire clicks
-          qsa('#trendingTags a').forEach(a=> a.addEventListener('click', (e)=>{ e.preventDefault(); const tag=a.dataset.tag; qs('#searchInput').value = tag; page=1; load(); }));
+          
           qsa('#topicsList button').forEach(b=> {
             b.addEventListener('click', ()=>{ 
               const tag=b.dataset.tag; 
@@ -815,7 +912,13 @@
             });
           });
         }
-      }catch(e){ }
+      }catch(e){ 
+        console.error('Failed to load trending posts:', e);
+        const trendingEl = qs('#trendingTags');
+        if(trendingEl) {
+          trendingEl.innerHTML = '<div class="text-white-50" style="font-size: 0.9rem;">Unable to load trending posts</div>';
+        }
+      }
       // browse button toggle
       const browseBtn = qs('#browseTopicsBtn');
       if(browseBtn) {
@@ -849,12 +952,16 @@
           <div class="post-image">
             <img src="${(() => {
               const fallback = 'https://picsum.photos/800/500?random=' + encodeURIComponent(p._id || Math.random());
-              if (!p.image) return fallback;
-              try {
-                if (/^https?:\/\//.test(p.image)) return p.image;
-                if (p.image.startsWith('/')) return API_ORIGIN + p.image;
-                return API_ORIGIN + '/uploads/' + encodeURIComponent(p.image);
-              } catch(e) { return fallback; }
+              
+              // Check if post has a cover photo using post ID
+              if (p.image) {
+                const coverPhotoUrl = API_ORIGIN + '/uploads/post-' + p._id + '.jpg';
+                console.log('📸 Using cover photo for', p.title + ':', coverPhotoUrl);
+                return coverPhotoUrl;
+              }
+              
+              console.log('📸 No cover photo for post:', p.title, '- using fallback');
+              return fallback;
             })()}" alt="${escapeHtml(p.title)}" onerror="this.onerror=null;this.src='https://picsum.photos/800/500?random=${escapeHtml(p._id||Math.random())}'" />
           </div>
           <div class="post-category">${escapeHtml(category)}</div>
@@ -899,31 +1006,200 @@
       <div class="container py-5">
         <div class="row">
           <div class="col-lg-8 mx-auto">
-            <h2 class="section-title">Create New Post</h2>
+            <h2 class="section-title">
+              Create New Post 
+              <span class="badge bg-gradient" style="background: linear-gradient(135deg, #6f42c1, #e83e8c); font-size: 0.5rem; vertical-align: top;">
+                <i class="bi bi-robot"></i> AI ENHANCED
+              </span>
+            </h2>
             <div class="mb-4">
               <input id="postTitle" class="form-control form-control-lg" placeholder="Post title" />
             </div>
-            <div class="editor-toolbar">
-              <button class="editor-btn" title="Bold" onclick="document.execCommand('bold')"><i class="bi bi-type-bold"></i></button>
-              <button class="editor-btn" title="Italic" onclick="document.execCommand('italic')"><i class="bi bi-type-italic"></i></button>
-              <button class="editor-btn" title="Heading" onclick="document.execCommand('formatBlock', false, 'h2')"><i class="bi bi-type-h2"></i></button>
-              <button class="editor-btn" title="List" onclick="document.execCommand('insertUnorderedList')"><i class="bi bi-list-ul"></i></button>
+            <div id="editor" class="mb-4" style="min-height: 300px;">
+              <p style="color: #6c757d; font-style: italic;">
+                ✨ Try the AI features! Start typing your content and then use the AI buttons below to generate titles, check spelling, and get content suggestions. 
+                <br><br>
+                Sample text: "Artificial intelligence is revolutionizing the way we create content. With AI-powered writing assistants, bloggers can now generate compelling headlines, check for grammar errors, and receive suggestions to improve their posts..."
+              </p>
             </div>
-            <div id="editor" contenteditable="true" class="mb-4" placeholder="Tell your story..."></div>
-            <div class="row g-3 mb-4">
-              <div class="col-md-8">
-                <input id="tagsInput" class="form-control" placeholder="Add tags (comma separated)" />
+            <div class="mb-4">
+              <input id="tagsInput" class="form-control" placeholder="Add tags (comma separated)" />
+            </div>
+            
+            <!-- Cover Photo Section with Cropping -->
+            <div class="cover-photo-section mb-4" style="border: 2px dashed #dee2e6; border-radius: 12px; padding: 20px; background: #f8f9fa;">
+              <div class="d-flex align-items-center mb-3">
+                <i class="bi bi-image" style="font-size: 1.5rem; color: #28a745; margin-right: 10px;"></i>
+                <h6 class="mb-0" style="color: #28a745;">Cover Photo</h6>
+                <small class="text-muted ms-2">(This will be the main image for your post)</small>
               </div>
-              <div class="col-md-4">
-                <input id="imageInput" type="file" accept="image/*" class="form-control" />
+              
+              <!-- Image Cropping Area -->
+              <div id="cropperContainer" class="mb-3" style="display: none;">
+                <div class="text-center mb-3">
+                  <h6 class="text-primary"><i class="bi bi-crop"></i> Crop Your Cover Photo</h6>
+                  <small class="text-muted">Click and drag the image to position it perfectly. Use the controls below to adjust the crop.</small>
+                </div>
+                
+                <!-- Crop Controls -->
+                <div class="mb-3">
+                  <div class="row g-2">
+                    <div class="col-auto">
+                      <button type="button" id="cropWider" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-arrows-expand"></i> Wider
+                      </button>
+                    </div>
+                    <div class="col-auto">
+                      <button type="button" id="cropNarrower" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-arrows-collapse"></i> Narrower
+                      </button>
+                    </div>
+                    <div class="col-auto">
+                      <button type="button" id="cropCenter" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-crosshair"></i> Center
+                      </button>
+                    </div>
+                    <div class="col-auto">
+                      <button type="button" id="cropFitAll" class="btn btn-outline-info btn-sm">
+                        <i class="bi bi-aspect-ratio"></i> Fit All
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="row">
+                  <div class="col-md-8">
+                    <div id="imageContainer" style="position: relative; max-width: 100%; max-height: 500px; overflow: hidden; border: 2px solid #dee2e6; border-radius: 8px; background: #f8f9fa; cursor: move;">
+                      <img id="cropperImage" src="" style="max-width: 100%; display: block;" />
+                      <div id="cropOverlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none;">
+                        <div style="position: absolute; border: 3px solid #007bff; border-radius: 4px; box-shadow: 0 0 0 2000px rgba(0,0,0,0.3);" id="cropBox"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-md-4">
+                    <div class="crop-controls">
+                      <h6 class="mb-2"><i class="bi bi-eye"></i> Preview (Post Card)</h6>
+                      <div id="cropPreview" style="width: 100%; max-width: 280px; height: 200px; border: 3px solid #28a745; border-radius: 8px; overflow: hidden; background: #f3f4f6; margin-bottom: 15px;">
+                        <img id="previewImg" src="" style="width: 100%; height: 100%; object-fit: cover;" />
+                      </div>
+                      <small class="text-success d-block mb-3">
+                        <i class="bi bi-info-circle"></i> This is exactly how your image will appear in the post card
+                      </small>
+                      <div class="d-grid gap-2">
+                        <button id="applyCrop" class="btn btn-success">
+                          <i class="bi bi-check-circle"></i> Apply This Crop
+                        </button>
+                        <button id="resetCrop" class="btn btn-outline-secondary">
+                          <i class="bi bi-arrow-clockwise"></i> Start Over
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Final Cover Photo Preview -->
+              <div id="coverPhotoPreview" class="mb-3" style="display: none;">
+                <div class="position-relative" style="max-width: 420px;">
+                  <img id="coverPhotoImg" src="" alt="Cover photo preview" 
+                       style="width: 100%; height: 200px; object-fit: cover; border-radius: 8px; border: 2px solid #28a745; background: #f3f4f6;" />
+                  <div class="position-absolute" style="top: 5px; right: 5px;">
+                    <button type="button" id="editCoverPhoto" 
+                            class="btn btn-sm btn-primary me-1" 
+                            style="width: 35px; height: 35px; border-radius: 50%; padding: 0;"
+                            title="Edit/Crop photo">
+                      <i class="bi bi-crop"></i>
+                    </button>
+                    <button type="button" id="removeCoverPhoto" 
+                            class="btn btn-sm btn-danger" 
+                            style="width: 35px; height: 35px; border-radius: 50%; padding: 0;"
+                            title="Remove cover photo">
+                      <i class="bi bi-x"></i>
+                    </button>
+                  </div>
+                </div>
+                <small class="text-success d-block mt-2"><i class="bi bi-check-circle"></i> Cover photo ready! This will appear as your post's main image.</small>
+              </div>
+              
+              <!-- Upload Section -->
+              <div id="coverPhotoUpload">
+                <input id="coverPhotoInput" type="file" accept="image/*" class="d-none" />
+                <button type="button" id="coverPhotoBtn" class="btn btn-outline-success btn-sm">
+                  <i class="bi bi-camera"></i> Choose Cover Photo
+                </button>
+                <small class="text-muted ms-2">Upload and crop to fit your post perfectly</small>
+                <br>
+                <button type="button" id="testCoverPhoto" class="btn btn-outline-info btn-sm mt-2">
+                  <i class="bi bi-bug"></i> Test Cover Photo Detection
+                </button>
+              </div>
+              
+              <!-- Loading State -->
+              <div id="coverPhotoUploading" class="d-none">
+                <div class="d-flex align-items-center">
+                  <div class="spinner-border spinner-border-sm text-success me-2" role="status"></div>
+                  <span class="text-success">Uploading cover photo...</span>
+                </div>
               </div>
             </div>
-            <div class="d-flex gap-3 mb-4">
+            
+            <!-- AI Enhancement Panel -->
+            <div class="ai-enhancement-panel mb-4" style="border: 2px solid #e9ecef; border-radius: 12px; padding: 20px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
+              <div class="d-flex align-items-center mb-3">
+                <i class="bi bi-robot" style="font-size: 1.5rem; color: #6f42c1; margin-right: 10px;"></i>
+                <h5 class="mb-0" style="color: #6f42c1;">AI Content Assistant</h5>
+              </div>
+              
+              <div class="row g-2 mb-3">
+                <div class="col-md-4">
+                  <button id="generateHeadingBtn" class="btn btn-outline-primary btn-sm w-100" 
+                          title="AI will analyze your content and create a compelling title">
+                    <i class="bi bi-lightbulb"></i> Generate Title
+                  </button>
+                </div>
+                <div class="col-md-4">
+                  <button id="checkSpellingBtn" class="btn btn-outline-success btn-sm w-100"
+                          title="Check for spelling and grammar errors">
+                    <i class="bi bi-check2-circle"></i> Check Spelling
+                  </button>
+                </div>
+                <div class="col-md-4">
+                  <button id="enhanceContentBtn" class="btn btn-outline-info btn-sm w-100"
+                          title="Get comprehensive AI analysis: SEO score, suggestions, and metrics">
+                    <i class="bi bi-stars"></i> Full Analysis
+                  </button>
+                </div>
+              </div>
+              
+              <!-- AI Results Area -->
+              <div id="aiResultsArea" class="ai-results" style="display: none;"></div>
+              
+              <!-- Scheduling Section -->
+              <div class="scheduling-section mt-3 p-3" style="background: rgba(255, 255, 255, 0.7); border-radius: 8px; border-left: 4px solid #6f42c1;">
+                <h6 class="mb-2"><i class="bi bi-calendar-check"></i> Smart Scheduling</h6>
+                <div class="row g-2">
+                  <div class="col-md-8">
+                    <input type="datetime-local" id="scheduledDateTime" class="form-control form-control-sm">
+                  </div>
+                  <div class="col-md-4">
+                    <button id="suggestTimeBtn" class="btn btn-outline-secondary btn-sm w-100">
+                      <i class="bi bi-clock"></i> Suggest Time
+                    </button>
+                  </div>
+                </div>
+                <small class="text-muted d-block mt-1">Leave empty to publish immediately</small>
+              </div>
+            </div>
+            
+            <div class="d-flex gap-2 mb-4">
               <button id="saveDraftBtn" class="btn btn-outline-primary flex-fill">
                 <i class="bi bi-save"></i> Save Draft
               </button>
+              <button id="smartScheduleBtn" class="btn btn-outline-success flex-fill">
+                <i class="bi bi-calendar-check"></i> Smart Schedule
+              </button>
               <button id="publishBtn" class="btn btn-primary flex-fill">
-                <i class="bi bi-send"></i> Publish
+                <i class="bi bi-send"></i> Publish Now
               </button>
             </div>
             <div id="previewArea" style="display:none" class="border rounded-3 p-4"></div>
@@ -944,56 +1220,843 @@
       window.currentQuill = null;
     }
 
-    // Initialize Quill editor in the #editor container
+    // Initialize enhanced Quill editor in the #editor container
     const quill = new Quill('#editor', {
       theme: 'snow',
-      placeholder: 'Tell your story...',
+      placeholder: '✨ Start writing your amazing story... Use the toolbar above for formatting!',
       modules: {
         toolbar: [
-          [{ header: [1, 2, 3, false] }],
+          [{ header: [1, 2, 3, 4, 5, 6, false] }],
+          [{ font: [] }],
+          [{ size: ['small', false, 'large', 'huge'] }],
           ['bold', 'italic', 'underline', 'strike'],
-          [{ list: 'ordered' }, { list: 'bullet' }],
-          ['link', 'image'],
+          [{ color: [] }, { background: [] }],
+          [{ script: 'sub' }, { script: 'super' }],
+          [{ list: 'ordered' }, { list: 'bullet' }, { indent: '-1' }, { indent: '+1' }],
+          [{ align: [] }],
+          ['blockquote', 'code-block'],
+          ['link', 'image', 'video'],
           ['clean']
         ]
-      }
+      },
+      formats: ['header', 'font', 'size', 'bold', 'italic', 'underline', 'strike', 'color', 'background', 'script', 'list', 'bullet', 'indent', 'align', 'blockquote', 'code-block', 'link', 'image', 'video']
     });
     // store global reference so subsequent renders reuse/clean it
     window.currentQuill = quill;
 
-    // Handle image uploads: when a file is selected, upload and insert into Quill
-    qs('#imageInput').addEventListener('change', async (e)=>{
-      const f = e.target.files[0]; if(!f) return;
-      const data = new FormData(); data.append('file', f);
-      try{
-    const res = await fetch(API_BASE + '/uploads', { method:'POST', body: data });
-    if(!res.ok) throw new Error('upload failed');
-    const j = await res.json();
-    // ensure absolute URL (server returns '/uploads/filename')
-    const imgUrl = (/^https?:\/\//.test(j.url)) ? j.url : (API_ORIGIN + j.url);
-    // insert image at current cursor position using the global instance
-    const q = window.currentQuill || quill;
-    const range = q.getSelection(true) || { index: 0 };
-    q.insertEmbed(range.index, 'image', imgUrl);
-      }catch(err){ alert('Image upload failed'); }
+    // Cover photo upload functionality with cropping
+    // Global variables for cropping
+    let currentImageFile = null;
+    let cropData = { x: 0, y: 0, width: 0, height: 0 };
+    let imageNaturalWidth = 0, imageNaturalHeight = 0;
+    
+    qs('#coverPhotoBtn').addEventListener('click', () => {
+      qs('#coverPhotoInput').click();
+    });
+    
+    qs('#coverPhotoInput').addEventListener('change', async (e) => {
+      const f = e.target.files[0]; 
+      if (!f) return;
+      
+      // Validate file type
+      if (!f.type.startsWith('image/')) {
+        alert('❌ Please select an image file only (JPG, PNG, GIF, etc.)');
+        e.target.value = '';
+        return;
+      }
+      
+      // Validate file size (10MB)
+      if (f.size > 10 * 1024 * 1024) {
+        alert('❌ File too large! Please select an image smaller than 10MB.');
+        e.target.value = '';
+        return;
+      }
+      
+      currentImageFile = f;
+      console.log('📷 Loading image for cropping:', f.name);
+      
+      // Create object URL for cropping
+      const imageUrl = URL.createObjectURL(f);
+      
+      // Load image for cropping
+      const cropperImg = qs('#cropperImage');
+      cropperImg.src = imageUrl;
+      
+      // Show cropper and hide upload button
+      qs('#coverPhotoUpload').style.display = 'none';
+      qs('#cropperContainer').style.display = 'block';
+      
+      // Initialize cropping when image loads
+      cropperImg.onload = () => {
+        imageNaturalWidth = cropperImg.naturalWidth;
+        imageNaturalHeight = cropperImg.naturalHeight;
+        
+        // Set initial crop area to use most of the image (1.4:1 ratio)
+        const targetRatio = 1.4; // width:height ratio matching post cards
+        
+        // Start with 90% of the image to show more content
+        let cropWidth = Math.min(imageNaturalWidth * 0.9, imageNaturalHeight * 0.9 * targetRatio);
+        let cropHeight = cropWidth / targetRatio;
+        
+        // If calculated height exceeds image, adjust
+        if (cropHeight > imageNaturalHeight * 0.9) {
+          cropHeight = imageNaturalHeight * 0.9;
+          cropWidth = cropHeight * targetRatio;
+        }
+        
+        cropData = {
+          x: (imageNaturalWidth - cropWidth) / 2,
+          y: (imageNaturalHeight - cropHeight) / 2,
+          width: cropWidth,
+          height: cropHeight
+        };
+        
+        updatePreview();
+        updateCropOverlay();
+      };
+      
+      e.target.value = ''; // Reset input
+    });
+    
+    // Crop control functions
+    function updatePreview() {
+      const previewImg = qs('#previewImg');
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      canvas.width = 280;
+      canvas.height = 200;
+      
+      const img = qs('#cropperImage');
+      
+      // Draw cropped area to canvas
+      ctx.drawImage(
+        img, 
+        cropData.x, cropData.y, cropData.width, cropData.height,
+        0, 0, canvas.width, canvas.height
+      );
+      
+      previewImg.src = canvas.toDataURL();
+    }
+    
+    // Update crop overlay visual
+    function updateCropOverlay() {
+      const img = qs('#cropperImage');
+      const cropBox = qs('#cropBox');
+      if (!img || !cropBox) return;
+      
+      const container = qs('#imageContainer');
+      const rect = container.getBoundingClientRect();
+      const imgRect = img.getBoundingClientRect();
+      
+      // Calculate scale between displayed image and natural size
+      const scaleX = img.offsetWidth / imageNaturalWidth;
+      const scaleY = img.offsetHeight / imageNaturalHeight;
+      
+      // Convert crop coordinates to display coordinates
+      const displayX = cropData.x * scaleX;
+      const displayY = cropData.y * scaleY;
+      const displayWidth = cropData.width * scaleX;
+      const displayHeight = cropData.height * scaleY;
+      
+      // Position the crop box
+      cropBox.style.left = displayX + 'px';
+      cropBox.style.top = displayY + 'px';
+      cropBox.style.width = displayWidth + 'px';
+      cropBox.style.height = displayHeight + 'px';
+    }
+    
+    // Crop control buttons
+    qs('#cropWider').addEventListener('click', () => {
+      const maxWidth = imageNaturalWidth * 0.95;
+      const newWidth = Math.min(cropData.width * 1.1, maxWidth);
+      const newHeight = newWidth / 1.4;
+      
+      if (newHeight <= imageNaturalHeight * 0.95) {
+        cropData.width = newWidth;
+        cropData.height = newHeight;
+        // Re-center if needed
+        cropData.x = Math.max(0, Math.min(cropData.x, imageNaturalWidth - cropData.width));
+        cropData.y = Math.max(0, Math.min(cropData.y, imageNaturalHeight - cropData.height));
+        updatePreview();
+        updateCropOverlay();
+      }
+    });
+    
+    qs('#cropNarrower').addEventListener('click', () => {
+      const minWidth = imageNaturalWidth * 0.3;
+      const newWidth = Math.max(cropData.width * 0.9, minWidth);
+      const newHeight = newWidth / 1.4;
+      
+      cropData.width = newWidth;
+      cropData.height = newHeight;
+      updatePreview();
+      updateCropOverlay();
+    });
+    
+    qs('#cropCenter').addEventListener('click', () => {
+      cropData.x = (imageNaturalWidth - cropData.width) / 2;
+      cropData.y = (imageNaturalHeight - cropData.height) / 2;
+      updatePreview();
+      updateCropOverlay();
+    });
+    
+    qs('#cropFitAll').addEventListener('click', () => {
+      const targetRatio = 1.4;
+      let newWidth, newHeight;
+      
+      if (imageNaturalWidth / imageNaturalHeight > targetRatio) {
+        newHeight = imageNaturalHeight * 0.95;
+        newWidth = newHeight * targetRatio;
+      } else {
+        newWidth = imageNaturalWidth * 0.95;
+        newHeight = newWidth / targetRatio;
+      }
+      
+      cropData = {
+        x: (imageNaturalWidth - newWidth) / 2,
+        y: (imageNaturalHeight - newHeight) / 2,
+        width: newWidth,
+        height: newHeight
+      };
+      
+      updatePreview();
+      updateCropOverlay();
+    });
+    
+    // Enhanced drag-to-move functionality
+    let isDragging = false;
+    let dragStart = { x: 0, y: 0 };
+    
+    qs('#cropperImage').addEventListener('mousedown', (e) => {
+      isDragging = true;
+      dragStart.x = e.clientX;
+      dragStart.y = e.clientY;
+      e.preventDefault();
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      
+      const deltaX = e.clientX - dragStart.x;
+      const deltaY = e.clientY - dragStart.y;
+      
+      // Convert screen coordinates to image coordinates
+      const img = qs('#cropperImage');
+      const rect = img.getBoundingClientRect();
+      const scaleX = imageNaturalWidth / rect.width;
+      const scaleY = imageNaturalHeight / rect.height;
+      
+      const newX = cropData.x - (deltaX * scaleX);
+      const newY = cropData.y - (deltaY * scaleY);
+      
+      // Constrain to image bounds
+      cropData.x = Math.max(0, Math.min(newX, imageNaturalWidth - cropData.width));
+      cropData.y = Math.max(0, Math.min(newY, imageNaturalHeight - cropData.height));
+      
+      dragStart.x = e.clientX;
+      dragStart.y = e.clientY;
+      
+      updatePreview();
+      updateCropOverlay();
+    });
+    
+    document.addEventListener('mouseup', () => {
+      isDragging = false;
+    });
+    
+    // Update overlay when image loads or window resizes
+    window.addEventListener('resize', () => {
+      if (qs('#cropperContainer').style.display !== 'none') {
+        setTimeout(updateCropOverlay, 100);
+      }
+    });
+    
+    // Apply crop button
+    qs('#applyCrop').addEventListener('click', async () => {
+      if (!currentImageFile) return;
+      
+      try {
+        qs('#applyCrop').disabled = true;
+        qs('#applyCrop').innerHTML = '<i class=\"bi bi-hourglass-split\"></i> Processing...';
+        
+        // Create canvas for cropped image (maintaining post card aspect ratio)
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Optimal dimensions for post cards (1.4:1 ratio)
+        canvas.width = Math.min(cropData.width, 560); // Max width 560px  
+        canvas.height = Math.min(cropData.height, 400); // Max height 400px
+        
+        // Ensure we maintain the aspect ratio
+        const targetRatio = 1.4;
+        if (canvas.width / canvas.height !== targetRatio) {
+          if (canvas.width > canvas.height * targetRatio) {
+            canvas.width = canvas.height * targetRatio;
+          } else {
+            canvas.height = canvas.width / targetRatio;
+          }
+        }
+        
+        const img = qs('#cropperImage');
+        
+        // Draw cropped image
+        ctx.drawImage(
+          img,
+          cropData.x, cropData.y, cropData.width, cropData.height,
+          0, 0, canvas.width, canvas.height
+        );
+        
+        // Convert to blob
+        canvas.toBlob(async (blob) => {
+          const formData = new FormData();
+          formData.append('file', blob, 'cover-photo.jpg');
+          
+          // Upload cropped image
+          const res = await fetch(API_BASE + '/uploads', {
+            method: 'POST',
+            body: formData
+          });
+          
+          if (!res.ok) {
+            throw new Error('Upload failed');
+          }
+          
+          const result = await res.json();
+          const imgUrl = (/^https?:\/\//.test(result.url)) ? result.url : (API_ORIGIN + result.url);
+          
+          console.log('📸 Cropped image upload result:', result);
+          console.log('📸 Final image URL:', imgUrl);
+          console.log('📸 Crop dimensions used:', {
+            x: cropData.x,
+            y: cropData.y,
+            width: cropData.width,
+            height: cropData.height,
+            canvasWidth: canvas.width,
+            canvasHeight: canvas.height
+          });
+          
+          // Show final preview with the exact same URL that will be saved
+          const coverPhotoImg = qs('#coverPhotoImg');
+          const coverPhotoPreview = qs('#coverPhotoPreview');
+          
+          // Use setAttribute to ensure the URL is set correctly
+          coverPhotoImg.setAttribute('src', imgUrl);
+          coverPhotoImg.src = imgUrl; // Also set the property
+          coverPhotoPreview.style.display = 'block';
+          qs('#cropperContainer').style.display = 'none';
+          
+          console.log('📸 Preview updated - src set to:', imgUrl);
+          console.log('📸 Preview getAttribute src:', coverPhotoImg.getAttribute('src'));
+          console.log('📸 Preview .src property:', coverPhotoImg.src);
+          console.log('📸 Preview display set to:', coverPhotoPreview.style.display);
+          
+          // Clean up
+          URL.revokeObjectURL(qs('#cropperImage').src);
+          
+          console.log('✅ Cover photo cropped and uploaded successfully');
+          alert('✅ Cover photo ready! This is exactly how it will appear in your post.');
+          
+        }, 'image/jpeg', 0.9);
+        
+      } catch (err) {
+        console.error('❌ Crop upload error:', err);
+        alert('❌ Failed to process cropped image: ' + err.message);
+      } finally {
+        qs('#applyCrop').disabled = false;
+        qs('#applyCrop').innerHTML = '<i class=\"bi bi-check-circle\"></i> Apply Crop';
+      }
+    });
+    
+    // Reset crop button
+    qs('#resetCrop').addEventListener('click', () => {
+      qs('#cropperContainer').style.display = 'none';
+      qs('#coverPhotoUpload').style.display = 'block';
+      if (qs('#cropperImage').src) {
+        URL.revokeObjectURL(qs('#cropperImage').src);
+      }
+    });
+    
+    // Edit cover photo button
+    qs('#editCoverPhoto').addEventListener('click', () => {
+      qs('#coverPhotoInput').click();
+    });
+    
+    // Remove cover photo functionality
+    qs('#removeCoverPhoto').addEventListener('click', () => {
+      qs('#coverPhotoPreview').style.display = 'none';
+      qs('#coverPhotoUpload').style.display = 'block';
+      qs('#coverPhotoImg').src = '';
+      console.log('🗑️ Cover photo removed');
+    });
+    
+    // Test cover photo detection
+    qs('#testCoverPhoto').addEventListener('click', () => {
+      const coverPhotoImg = qs('#coverPhotoImg');
+      const coverPhotoPreview = qs('#coverPhotoPreview');
+      
+      console.log('🔍 COVER PHOTO TEST:');
+      console.log('  - Image element:', coverPhotoImg);
+      console.log('  - Image getAttribute src:', coverPhotoImg?.getAttribute('src'));
+      console.log('  - Image .src property:', coverPhotoImg?.src);
+      console.log('  - Preview element:', coverPhotoPreview);
+      console.log('  - Preview display:', coverPhotoPreview?.style.display);
+      
+      const imgSrc = coverPhotoImg?.getAttribute('src');
+      if (imgSrc && imgSrc !== '' && imgSrc.includes('/uploads/')) {
+        console.log('✅ Cover photo detected! URL:', imgSrc);
+        
+        // Test the processing logic
+        let finalImagePath = null;
+        if (imgSrc.startsWith('http://localhost:4000')) {
+          finalImagePath = imgSrc.replace('http://localhost:4000', '');
+        } else if (imgSrc.startsWith(API_ORIGIN)) {
+          finalImagePath = imgSrc.replace(API_ORIGIN, '');
+        } else if (imgSrc.startsWith('/uploads/')) {
+          finalImagePath = imgSrc;
+        } else if (imgSrc.includes('/uploads/')) {
+          const match = imgSrc.match(/\/uploads\/[^?]+/);
+          if (match) {
+            finalImagePath = match[0];
+          }
+        } else {
+          finalImagePath = '/uploads/' + imgSrc;
+        }
+        console.log('📁 Final image path would be:', finalImagePath);
+        
+        alert('✅ Cover photo detected!\\ngetAttribute URL: ' + imgSrc + '\\n.src property: ' + coverPhotoImg.src + '\\nFinal path: ' + finalImagePath);
+      } else {
+        console.log('❌ No cover photo detected');
+        alert('❌ No cover photo detected. Please upload and crop a cover photo first.');
+      }
     });
 
     async function submit(publish=false){
       const editorInst = window.currentQuill || quill;
+      const scheduledDateTime = qs('#scheduledDateTime')?.value;
+      
+      // Get actual content (excluding placeholder text)
+      const actualContent = getActualEditorContent();
+      
+      // Validate content before submission
+      if (!actualContent.trim() || actualContent.trim() === '<p><br></p>') {
+        alert('⚠️ Please write some content for your post before submitting!');
+        qs('#editor')?.focus();
+        return;
+      }
+      
+      // Validate title
+      if (!title.value.trim()) {
+        alert('⚠️ Please add a title for your post!');
+        title.focus();
+        return;
+      }
+      
+      // Check if smart scheduling is requested
+      const isScheduled = scheduledDateTime && scheduledDateTime.trim() !== '';
+      
+      // Check if we have a cover photo uploaded
+      const coverPhotoImg = qs('#coverPhotoImg');
+      const coverPhotoPreview = qs('#coverPhotoPreview');
+      
+      // Store the temporary uploaded file name for post-creation processing
+      let tempImageFilename = null;
+      let hasCoverPhoto = false;
+      
+      if (coverPhotoImg && coverPhotoPreview && coverPhotoPreview.style.display === 'block') {
+        const imgSrc = coverPhotoImg.getAttribute('src') || coverPhotoImg.src;
+        console.log('📸 Checking cover photo:', imgSrc);
+        
+        if (imgSrc && imgSrc.includes('/uploads/')) {
+          // Extract filename from URL
+          const match = imgSrc.match(/\/uploads\/([^/?]+)/);
+          if (match && match[1]) {
+            tempImageFilename = match[1];
+            hasCoverPhoto = true;
+            console.log('📸 Temporary filename extracted:', tempImageFilename);
+          }
+        }
+      }
+      
       const payload = {
-        title: title.value,
-        content: editorInst.root.innerHTML,
+        title: title.value.trim(),
+        content: actualContent,
         tags: tagsInput.value.split(',').map(t=>t.trim()).filter(Boolean),
-        published: publish
+        status: isScheduled ? 'scheduled' : (publish ? 'published' : 'draft'),
+        scheduledAt: isScheduled ? new Date(scheduledDateTime).toISOString() : null,
+        hasCoverPhoto: hasCoverPhoto,
+        tempImageFilename: tempImageFilename
       };
+      
+      // Debug logging for cover photo
+      console.log('📸 Cover Photo Debug:');
+      console.log('  - Has cover photo:', hasCoverPhoto);
+      console.log('  - Temp filename:', tempImageFilename);
+      console.log('  - Preview visible:', coverPhotoPreview?.style.display === 'block');
+      
+      if (hasCoverPhoto) {
+        console.log('✅ Cover photo will be processed after post creation!');
+      } else {
+        console.log('❌ No cover photo - post will use post ID based lookup');
+      }
+      
       try{
-        const data = await apiFetch('/posts', { method: 'POST', body: JSON.stringify(payload) });
-        location.hash = '#/post/' + data._id;
-      }catch(err){ alert('Failed to save post'); }
+        let endpoint = '/posts';
+        
+        // Use smart scheduling endpoint if scheduling is requested
+        if (isScheduled) {
+          endpoint = '/posts/schedule';
+          
+          // Show scheduling confirmation
+          const scheduleDate = new Date(scheduledDateTime);
+          const confirmSchedule = confirm(
+            `Schedule this post to be published automatically on:\n${scheduleDate.toLocaleString()}?\n\nClick OK to schedule or Cancel to save as draft.`
+          );
+          
+          if (!confirmSchedule) {
+            // User cancelled, save as draft instead
+            payload.status = 'draft';
+            payload.scheduledAt = null;
+            endpoint = '/posts';
+          }
+        }
+        
+        console.log('🚀 Sending post to server:', {
+          endpoint: endpoint,
+          payload: payload
+        });
+        
+        const data = await apiFetch(endpoint, { method: 'POST', body: JSON.stringify(payload) });
+        
+        console.log('✅ Server response:', data);
+        console.log('📸 Post created with image:', data.image);
+        
+        const hasImage = hasCoverPhoto ? ' with cover photo' : '';
+        
+        if (isScheduled && payload.status === 'scheduled') {
+          // Show success message for scheduled post
+          const scheduleDate = new Date(scheduledDateTime);
+          alert(`🚀 Post scheduled successfully${hasImage}!\n\nYour post "${payload.title}" will be automatically published on:\n${scheduleDate.toLocaleString()}\n\nYou can manage scheduled posts from your dashboard.`);
+        } else if (publish) {
+          alert(`✅ Post published successfully${hasImage}!\n\n${hasCoverPhoto ? '📸 Your cover photo will appear on the home page.' : '🎲 Using random placeholder image.'}\n\nClick OK to view your post or go to Home to see it in the feed.`);
+        } else {
+          alert(`📝 Post saved as draft${hasImage}\n\n${hasCoverPhoto ? '📸 Cover photo saved with draft.' : ''}`);
+        }
+        
+        // Navigate to the post or dashboard based on status
+        if (payload.status === 'scheduled') {
+          location.hash = '#/my-posts'; // Go to dashboard to see scheduled posts
+        } else {
+          location.hash = '#/post/' + data._id;
+        }
+        
+      } catch(err) { 
+        console.error('Post submission error:', err);
+        if (err.message.includes('scheduled time')) {
+          alert('❌ Scheduling Error: ' + err.message);
+        } else {
+          alert('❌ Failed to save post: ' + (err.message || 'Unknown error'));
+        }
+      }
     }
 
     qs('#saveDraftBtn').onclick = ()=> submit(false);
     qs('#publishBtn').onclick = ()=> submit(true);
+    
+    // Add smart scheduling button handler
+    const smartScheduleBtn = qs('#smartScheduleBtn');
+    if (smartScheduleBtn) {
+      smartScheduleBtn.onclick = async () => {
+        const scheduledDateTime = qs('#scheduledDateTime')?.value;
+        
+        if (!scheduledDateTime || scheduledDateTime.trim() === '') {
+          alert('⚠️ Please select a date and time for scheduling!');
+          qs('#scheduledDateTime')?.focus();
+          return;
+        }
+        
+        const scheduleDate = new Date(scheduledDateTime);
+        const now = new Date();
+        
+        if (scheduleDate <= now) {
+          alert('⚠️ Scheduled time must be in the future!');
+          qs('#scheduledDateTime')?.focus();
+          return;
+        }
+        
+        // Calculate time until posting
+        const timeDiff = scheduleDate.getTime() - now.getTime();
+        const days = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+        
+        let timeString = '';
+        if (days > 0) timeString += `${days} day${days > 1 ? 's' : ''}, `;
+        if (hours > 0) timeString += `${hours} hour${hours > 1 ? 's' : ''}, `;
+        timeString += `${minutes} minute${minutes > 1 ? 's' : ''}`;
+        
+        const confirmMessage = `🚀 Smart Schedule Confirmation\n\nYour post will be automatically published in: ${timeString}\nScheduled for: ${scheduleDate.toLocaleString()}\n\nThe system will publish your post exactly at the scheduled time.\n\nContinue with smart scheduling?`;
+        
+        if (confirm(confirmMessage)) {
+          submit(false); // This will trigger smart scheduling due to scheduledDateTime value
+        }
+      };
+    }
+  }
+
+  // Initialize edit mode cover photo functionality
+  function initEditCoverPhotoFunctionality(post) {
+    console.log('📸 initEditCoverPhotoFunctionality called with post:', post);
+    
+    // Use an offscreen canvas for cropping and resize operations
+    let editCropCanvas = document.createElement('canvas');
+    let editCropContext = editCropCanvas.getContext('2d');
+    let editImage, editCropOverlay;
+    let editIsDragging = false;
+    let editDragStart = { x: 0, y: 0 };
+    let editCropBox = { x: 50, y: 50, width: 300, height: 214 }; // 1.4:1 ratio
+    
+    const editCoverPhotoInput = qs('#editCoverPhotoInput');
+    // In the inlined edit HTML the cropper container and controls use these IDs
+    const editCropInterface = qs('#editCropperContainer');
+    const editCropAndUploadBtn = qs('#editApplyCrop');
+    const editRemoveCoverBtn = qs('#editRemoveCoverPhoto');
+    const editCoverPhotoPreview = qs('#editCoverPhotoPreview');
+    const editCoverPhotoImg = qs('#editCoverPhotoImg');
+    
+    // Show existing cover photo if available (use edited preview element)
+    if (post && post.image) {
+      const existingImageUrl = API_ORIGIN + '/uploads/post-' + post._id + '.jpg';
+      if (editCoverPhotoImg) {
+        editCoverPhotoImg.src = existingImageUrl;
+        editCoverPhotoPreview.style.display = 'block';
+      }
+    } else {
+      if (editCoverPhotoPreview) editCoverPhotoPreview.style.display = 'none';
+    }
+    
+    editCoverPhotoInput.onchange = function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      console.log('📷 Loading image for editing:', file.name);
+      
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        editImage = new Image();
+        editImage.onload = function() {
+          setupEditCropCanvas();
+          if (editCropInterface) editCropInterface.style.display = 'block';
+        };
+        editImage.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    };
+    
+    function setupEditCropCanvas() {
+      // Use offscreen canvas with same logical size used for previewing
+      editCropContext = editCropCanvas.getContext('2d');
+      editCropOverlay = qs('#editCropOverlay');
+      
+      const containerWidth = 471;
+      const containerHeight = 337;
+      
+      editCropCanvas.width = containerWidth;
+      editCropCanvas.height = containerHeight;
+      
+      drawEditImage();
+      setupEditCropOverlay();
+      setupEditDragFunctionality();
+    }
+    
+    function drawEditImage() {
+      const canvasWidth = editCropCanvas.width;
+      const canvasHeight = editCropCanvas.height;
+      const imageRatio = editImage.width / editImage.height;
+      const canvasRatio = canvasWidth / canvasHeight;
+      
+      let drawWidth, drawHeight;
+      if (imageRatio > canvasRatio) {
+        drawHeight = canvasHeight;
+        drawWidth = drawHeight * imageRatio;
+      } else {
+        drawWidth = canvasWidth;
+        drawHeight = drawWidth / imageRatio;
+      }
+      
+      const offsetX = (canvasWidth - drawWidth) / 2;
+      const offsetY = (canvasHeight - drawHeight) / 2;
+      
+      editCropContext.clearRect(0, 0, canvasWidth, canvasHeight);
+      editCropContext.fillStyle = '#000000';
+      editCropContext.fillRect(0, 0, canvasWidth, canvasHeight);
+      editCropContext.drawImage(editImage, offsetX, offsetY, drawWidth, drawHeight);
+    }
+    
+    function setupEditCropOverlay() {
+      const aspectRatio = 1.4;
+      const maxWidth = Math.min(300, editCropCanvas.width * 0.8);
+      const height = maxWidth / aspectRatio;
+      
+      editCropBox = {
+        x: (editCropCanvas.width - maxWidth) / 2,
+        y: (editCropCanvas.height - height) / 2,
+        width: maxWidth,
+        height: height
+      };
+      
+      updateEditCropOverlay();
+    }
+    
+    function updateEditCropOverlay() {
+      const rect = editCropCanvas.getBoundingClientRect();
+      editCropOverlay.style.left = editCropBox.x + 'px';
+      editCropOverlay.style.top = editCropBox.y + 'px';
+      editCropOverlay.style.width = editCropBox.width + 'px';
+      editCropOverlay.style.height = editCropBox.height + 'px';
+      updateEditPreview();
+    }
+    
+    function updateEditPreview() {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      canvas.width = 400;
+      canvas.height = 400 / 1.4;
+      
+      const scaleX = editImage.width / editCropCanvas.width;
+      const scaleY = editImage.height / editCropCanvas.height;
+      
+      const sourceX = editCropBox.x * scaleX;
+      const sourceY = editCropBox.y * scaleY;
+      const sourceWidth = editCropBox.width * scaleX;
+      const sourceHeight = editCropBox.height * scaleY;
+      
+      ctx.drawImage(editImage, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, canvas.width, canvas.height);
+      
+      if (editCoverPhotoImg) {
+        editCoverPhotoImg.src = canvas.toDataURL('image/jpeg', 0.9);
+        editCoverPhotoPreview.style.display = 'block';
+      }
+    }
+    
+    function setupEditDragFunctionality() {
+      if (editCropOverlay) editCropOverlay.addEventListener('mousedown', startEditDrag);
+      document.addEventListener('mousemove', editDrag);
+      document.addEventListener('mouseup', stopEditDrag);
+    }
+    
+    function startEditDrag(e) {
+      editIsDragging = true;
+      const rect = editCropCanvas.getBoundingClientRect();
+      editDragStart.x = e.clientX - rect.left - editCropBox.x;
+      editDragStart.y = e.clientY - rect.top - editCropBox.y;
+      editCropOverlay.style.cursor = 'grabbing';
+    }
+    
+    function editDrag(e) {
+      if (!editIsDragging) return;
+      
+      const rect = editCropCanvas.getBoundingClientRect();
+      let newX = e.clientX - rect.left - editDragStart.x;
+      let newY = e.clientY - rect.top - editDragStart.y;
+      
+      newX = Math.max(0, Math.min(newX, editCropCanvas.width - editCropBox.width));
+      newY = Math.max(0, Math.min(newY, editCropCanvas.height - editCropBox.height));
+      
+      editCropBox.x = newX;
+      editCropBox.y = newY;
+      
+      updateEditCropOverlay();
+    }
+    
+    function stopEditDrag() {
+      editIsDragging = false;
+      editCropOverlay.style.cursor = 'move';
+    }
+    
+    editCropAndUploadBtn.onclick = async function() {
+      if (!editImage) {
+        alert('⚠️ Please select an image first!');
+        return;
+      }
+      
+      try {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        canvas.width = 800;
+        canvas.height = canvas.width / 1.4;
+        
+        const scaleX = editImage.width / editCropCanvas.width;
+        const scaleY = editImage.height / editCropCanvas.height;
+        
+        const sourceX = editCropBox.x * scaleX;
+        const sourceY = editCropBox.y * scaleY;
+        const sourceWidth = editCropBox.width * scaleX;
+        const sourceHeight = editCropBox.height * scaleY;
+        
+        ctx.drawImage(editImage, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, canvas.width, canvas.height);
+        
+        canvas.toBlob(async (blob) => {
+          const formData = new FormData();
+          formData.append('file', blob, 'cover-photo.jpg');
+          
+          // Use API_BASE + '/uploads' and the standard accessToken header
+          const response = await fetch(API_BASE + '/uploads', {
+            method: 'POST',
+            headers: {
+              'Authorization': 'Bearer ' + localStorage.getItem('accessToken')
+            },
+            body: formData
+          });
+          
+          if (!response.ok) {
+            const txt = await response.text().catch(()=>null);
+            throw new Error('Upload failed: ' + (txt || response.status));
+          }
+
+          const result = await response.json();
+          console.log('📸 Edit mode cropped image upload result:', result);
+          
+          // Update the existing cover photo display
+          const finalImageUrl = (/^https?:\/\//.test(result.url)) ? result.url : (API_ORIGIN + result.url);
+          if (editCoverPhotoImg) {
+            editCoverPhotoImg.src = finalImageUrl;
+            editCoverPhotoPreview.style.display = 'block';
+          }
+          
+          // Store the temp filename for when the post is updated
+          window._editCoverPhotoFilename = result.filename;
+          window._editHasCoverPhoto = true;
+          
+          // Hide crop interface
+          if (editCropInterface) editCropInterface.style.display = 'none';
+          editCoverPhotoInput.value = '';
+          
+          console.log('✅ Edit mode cover photo ready for update');
+          
+        }, 'image/jpeg', 0.9);
+      } catch (error) {
+        console.error('❌ Edit crop and upload error:', error);
+        alert('❌ Failed to process cover photo: ' + error.message);
+      }
+    };
+    
+    editRemoveCoverBtn.onclick = function() {
+      editCoverPhotoPreview.style.display = 'none';
+      editCropInterface.style.display = 'none';
+      editCoverPhotoInput.value = '';
+      editExistingCoverPreview.style.display = 'none';
+      editNoCoverPhoto.style.display = 'block';
+      
+      // Mark for removal
+      window._editCoverPhotoFilename = null;
+      window._editHasCoverPhoto = false;
+      window._editRemoveCoverPhoto = true;
+      
+      console.log('📸 Cover photo marked for removal');
+    };
   }
 
   function insertHtmlAtCursor(html) {
@@ -1134,6 +2197,9 @@
           // Update the post object to maintain consistency
           post.likes = res.likes || [];
           post.dislikes = res.dislikes || [];
+          
+          // Record engagement for reader earnings
+          recordEngagement(post._id, 'like');
         }catch(err){ handleApiErr(err); }
       };
       
@@ -1171,6 +2237,9 @@
             body: JSON.stringify({ post: post._id, content: txt }) 
           });
           
+          // Record engagement for reader earnings
+          recordEngagement(post._id, 'comment');
+          
           // Clear the input
           qs('#commentInput').value = '';
           
@@ -1190,6 +2259,10 @@
       };
 
       renderComments(comments);
+      
+      // Start reading time tracking for monetization
+      startReadingTimeTracking(post._id);
+      
     }catch(err){
       container.innerHTML = `
         <div class="container py-5">
@@ -1197,6 +2270,303 @@
         </div>
       `;
     }
+  }
+
+  // Reading time tracking for monetization
+  let readingTimeTracker = null;
+  let readingStartTime = null;
+
+  function startReadingTimeTracking(postId) {
+    if (!postId) return;
+    
+    // Clear any existing tracker
+    if (readingTimeTracker) {
+      clearInterval(readingTimeTracker);
+    }
+    
+    readingStartTime = Date.now();
+    let totalReadingTime = 0;
+    
+    
+    // Track reading time every 30 seconds
+    readingTimeTracker = setInterval(async () => {
+      const currentTime = Date.now();
+      const sessionTime = Math.floor((currentTime - readingStartTime) / 1000); // seconds
+      
+      // Only record if user has been reading for at least 15 seconds
+      if (sessionTime >= 15) {
+        try {
+          const response = await apiFetch('/monetization/record-view', {
+            method: 'POST',
+            body: JSON.stringify({
+              postId: postId,
+              readingTime: sessionTime
+            })
+          });
+          
+          // Show earnings notification if any were generated
+          if (response.earnings && (response.earnings.author || response.earnings.reader)) {
+            showEarningsNotification(response.earnings, sessionTime);
+          }
+          
+          // Reset the start time for next interval
+          readingStartTime = currentTime;
+          totalReadingTime += sessionTime;
+          
+        } catch (err) {
+          console.error('Failed to record reading time:', err);
+        }
+      }
+    }, 30000); // Every 30 seconds
+    
+    // Record view when user leaves the page
+    window.addEventListener('beforeunload', () => {
+      if (readingStartTime && Date.now() - readingStartTime > 5000) { // At least 5 seconds
+        const finalSessionTime = Math.floor((Date.now() - readingStartTime) / 1000);
+        
+        // Use sendBeacon for reliable tracking on page unload
+        if (navigator.sendBeacon) {
+          const data = JSON.stringify({
+            postId: postId,
+            readingTime: finalSessionTime
+          });
+          
+          const token = localStorage.getItem('accessToken');
+          const headers = { 'Content-Type': 'application/json' };
+          if (token) headers['Authorization'] = 'Bearer ' + token;
+          
+          navigator.sendBeacon(
+            API_BASE + '/monetization/record-view',
+            new Blob([data], { type: 'application/json' })
+          );
+        }
+      }
+    });
+    
+    // Also track when user switches away from tab
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && readingStartTime) {
+        // Pause tracking when tab is hidden
+        const sessionTime = Math.floor((Date.now() - readingStartTime) / 1000);
+        if (sessionTime >= 5) {
+          recordReadingTime(postId, sessionTime);
+        }
+      } else if (!document.hidden) {
+        // Resume tracking when tab becomes visible again
+        readingStartTime = Date.now();
+      }
+    });
+  }
+
+  async function recordReadingTime(postId, seconds) {
+    try {
+      const response = await apiFetch('/monetization/record-view', {
+        method: 'POST',
+        body: JSON.stringify({
+          postId: postId,
+          readingTime: seconds
+        })
+      });
+      
+      // Show earnings notification if any were generated
+      if (response.earnings && (response.earnings.author || response.earnings.reader)) {
+        showEarningsNotification(response.earnings, seconds);
+      }
+    } catch (err) {
+      console.error('Failed to record reading time:', err);
+    }
+  }
+
+  // Show earnings notification when user earns money
+  function showEarningsNotification(earnings, readingTime) {
+    let message = '';
+    let totalEarned = 0;
+    
+    if (earnings.author) {
+      message += `📝 Author: +$${earnings.author.amount.toFixed(4)} `;
+      totalEarned += earnings.author.amount;
+    }
+    
+    if (earnings.reader) {
+      message += `📖 Reader: +$${earnings.reader.amount.toFixed(4)} `;
+      totalEarned += earnings.reader.amount;
+    }
+    
+    message += `(${readingTime}s reading)`;
+    
+    // Create earnings toast notification
+    const toast = document.createElement('div');
+    toast.className = 'earnings-toast';
+    toast.innerHTML = `
+      <div class="d-flex align-items-center">
+        <div class="me-2">
+          <i class="bi bi-cash-coin text-success"></i>
+        </div>
+        <div class="flex-grow-1">
+          <div class="fw-bold text-success">+$${totalEarned.toFixed(4)} earned!</div>
+          <small class="text-muted">${message}</small>
+        </div>
+      </div>
+    `;
+    
+    // Add CSS for toast if not exists
+    if (!document.querySelector('#earnings-toast-style')) {
+      const style = document.createElement('style');
+      style.id = 'earnings-toast-style';
+      style.textContent = `
+        .earnings-toast {
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background: white;
+          border: 1px solid #28a745;
+          border-radius: 8px;
+          padding: 12px 16px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+          z-index: 9999;
+          min-width: 300px;
+          animation: slideInRight 0.3s ease-out;
+        }
+        
+        @keyframes slideInRight {
+          from { transform: translateX(100%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+        
+        @keyframes slideOutRight {
+          from { transform: translateX(0); opacity: 1; }
+          to { transform: translateX(100%); opacity: 0; }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+    
+    document.body.appendChild(toast);
+    
+    // Remove toast after 4 seconds
+    setTimeout(() => {
+      toast.style.animation = 'slideOutRight 0.3s ease-out';
+      setTimeout(() => {
+        if (toast.parentNode) {
+          toast.parentNode.removeChild(toast);
+        }
+      }, 300);
+    }, 4000);
+    
+    // Update live earnings counter
+    updateLiveEarningsCounter(totalEarned);
+    
+    // Play a subtle sound effect (optional)
+    try {
+      const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmUdBjiH0PKq');
+      audio.volume = 0.1;
+      audio.play().catch(() => {}); // Ignore errors if sound fails
+    } catch (e) {}
+  }
+
+  // Update live earnings counter in navigation
+  let currentLiveEarnings = 0;
+  function updateLiveEarningsCounter(additionalEarnings) {
+    currentLiveEarnings += additionalEarnings;
+    const counter = qs('#liveEarningsCounter');
+    if (counter) {
+      counter.textContent = `+$${currentLiveEarnings.toFixed(4)}`;
+      counter.style.display = 'inline';
+      
+      // Add a subtle animation
+      counter.style.transform = 'scale(1.2)';
+      setTimeout(() => {
+        counter.style.transform = 'scale(1)';
+      }, 200);
+    }
+  }
+
+  // Initialize live earnings counter when user logs in
+  function initializeLiveEarnings() {
+    currentLiveEarnings = 0;
+    const counter = qs('#liveEarningsCounter');
+    if (counter) {
+      counter.style.display = 'none';
+    }
+  }
+
+  // Record engagement for reader earnings
+  async function recordEngagement(postId, type) {
+    try {
+      const response = await apiFetch('/monetization/record-engagement', {
+        method: 'POST',
+        body: JSON.stringify({
+          postId: postId,
+          type: type
+        })
+      });
+      
+      // Show engagement notification
+      if (response.success) {
+        showEngagementNotification(type);
+      }
+    } catch (err) {
+      console.error('Failed to record engagement:', err);
+    }
+  }
+
+  // Show engagement notification
+  function showEngagementNotification(type) {
+    const icons = {
+      'like': '👍',
+      'comment': '💬',
+      'dislike': '👎'
+    };
+    
+    const messages = {
+      'like': 'Like recorded! Building your reader stats...',
+      'comment': 'Comment posted! Engagement helps your earnings...',
+      'dislike': 'Feedback recorded!'
+    };
+    
+    // Create simple toast
+    const toast = document.createElement('div');
+    toast.className = 'engagement-toast';
+    toast.innerHTML = `
+      <div class="d-flex align-items-center">
+        <div class="me-2 fs-4">${icons[type] || '📝'}</div>
+        <div class="small text-muted">${messages[type] || 'Engagement recorded!'}</div>
+      </div>
+    `;
+    
+    // Add CSS for engagement toast if not exists
+    if (!document.querySelector('#engagement-toast-style')) {
+      const style = document.createElement('style');
+      style.id = 'engagement-toast-style';
+      style.textContent = `
+        .engagement-toast {
+          position: fixed;
+          top: 80px;
+          right: 20px;
+          background: #f8f9fa;
+          border: 1px solid #dee2e6;
+          border-radius: 6px;
+          padding: 8px 12px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+          z-index: 9998;
+          min-width: 250px;
+          animation: slideInRight 0.2s ease-out;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+    
+    document.body.appendChild(toast);
+    
+    // Remove toast after 2 seconds
+    setTimeout(() => {
+      toast.style.animation = 'slideOutRight 0.2s ease-out';
+      setTimeout(() => {
+        if (toast.parentNode) {
+          toast.parentNode.removeChild(toast);
+        }
+      }, 200);
+    }, 2000);
   }
 
   function renderComments(comments){
@@ -1303,6 +2673,7 @@
         
         localStorage.setItem('accessToken', j.accessToken);
         localStorage.setItem('me', JSON.stringify(j.user));
+        initializeLiveEarnings(); // Reset earnings counter for new session
         location.hash = '#/';
       }catch(err){ 
         const alertEl = document.createElement('div'); 
@@ -1383,6 +2754,7 @@
         if(j && j.accessToken){ 
           localStorage.setItem('accessToken', j.accessToken); 
           localStorage.setItem('me', JSON.stringify(j.user)); 
+          initializeLiveEarnings(); // Reset earnings counter for new session
           location.hash = '#/'; 
           return; 
         }
@@ -1416,11 +2788,46 @@
           <div class="col-lg-10 mx-auto">
             <div class="d-flex justify-content-between align-items-center mb-4">
               <h2 class="section-title mb-0">My Posts</h2>
-              <a href="#/editor" class="btn btn-primary">
+              <a href="#/editor" class="btn btn-primary position-relative">
                 <i class="bi bi-plus-circle"></i> Create New Post
+                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-success" style="font-size: 0.6rem;">
+                  AI
+                </span>
               </a>
             </div>
-            <div id="myPostsList" class="posts-grid"></div>
+            
+            <!-- Post Status Tabs -->
+            <ul class="nav nav-pills mb-4" id="postTabs" role="tablist">
+              <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="published-tab" data-bs-toggle="pill" data-bs-target="#published" type="button" role="tab">
+                  <i class="bi bi-check-circle"></i> Published
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="draft-tab" data-bs-toggle="pill" data-bs-target="#draft" type="button" role="tab">
+                  <i class="bi bi-file-earmark"></i> Drafts
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="scheduled-tab" data-bs-toggle="pill" data-bs-target="#scheduled" type="button" role="tab">
+                  <i class="bi bi-calendar-check"></i> Scheduled <span id="scheduledCount" class="badge bg-primary ms-1">0</span>
+                </button>
+              </li>
+            </ul>
+            
+            <!-- Tab Content -->
+            <div class="tab-content" id="postTabContent">
+              <div class="tab-pane fade show active" id="published" role="tabpanel">
+                <div id="publishedPostsList" class="posts-grid"></div>
+              </div>
+              <div class="tab-pane fade" id="draft" role="tabpanel">
+                <div id="draftPostsList" class="posts-grid"></div>
+              </div>
+              <div class="tab-pane fade" id="scheduled" role="tabpanel">
+                <div id="scheduledPostsList"></div>
+              </div>
+            </div>
+            
             <div class="d-flex justify-content-center mb-5">
               <nav><ul id="myPostsPagination" class="pagination"></ul></nav>
             </div>
@@ -1430,27 +2837,38 @@
     `;
 
     let page = 1, limit = 9;
-    const loadMyPosts = async () => {
-      const list = qs('#myPostsList');
+    
+    // Load posts by status
+    const loadPostsByStatus = async (status) => {
+      const listSelector = `#${status}PostsList`;
+      const list = qs(listSelector);
+      if (!list) return;
+      
       list.innerHTML = '<div class="col-12 text-center py-5"><div class="loading-spinner"></div></div>';
       
       try {
-        // Filter posts by the current user
-        const data = await apiFetch(`/posts?page=${page}&limit=${limit}`);
+        const data = await apiFetch(`/posts?page=${page}&limit=${limit}&status=${status}`);
         const allPosts = data.items || [];
         
         // Filter to only show posts by current user
         const myPosts = allPosts.filter(post => post.author && (post.author._id === user.id || post.author._id === user._id));
         
         if (myPosts.length === 0) {
+          const emptyMessages = {
+            published: { icon: 'bi-check-circle', title: 'No published posts', text: 'Your published posts will appear here' },
+            draft: { icon: 'bi-file-earmark', title: 'No drafts', text: 'Save drafts to continue working on them later' },
+            scheduled: { icon: 'bi-calendar-check', title: 'No scheduled posts', text: 'Schedule posts to be published automatically' }
+          };
+          const msg = emptyMessages[status] || emptyMessages.published;
+          
           list.innerHTML = `
             <div class="col-12">
               <div class="empty-state">
-                <i class="bi bi-journal-plus"></i>
-                <h4>No posts yet</h4>
-                <p>Start sharing your thoughts with the world!</p>
+                <i class="bi ${msg.icon}"></i>
+                <h4>${msg.title}</h4>
+                <p>${msg.text}</p>
                 <a href="#/editor" class="btn btn-primary mt-3">
-                  <i class="bi bi-plus-circle"></i> Write your first post
+                  <i class="bi bi-plus-circle"></i> Create New Post
                 </a>
               </div>
             </div>
@@ -1458,54 +2876,214 @@
           return;
         }
         
-        list.innerHTML = myPosts.map(p => myPostCardHtml(p)).join('');
-        
-        // Add event listeners for view, edit, delete actions
-        qsa('[data-action="view"]').forEach(el => {
-          el.addEventListener('click', () => {
-            const id = el.dataset.id;
-            location.hash = '#/post/' + id;
-          });
-        });
-        
-        qsa('[data-action="edit"]').forEach(el => {
-          el.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const id = el.dataset.id;
-            location.hash = '#/post/' + id; // Will show edit buttons since it's user's post
-          });
-        });
-        
-        qsa('[data-action="delete"]').forEach(el => {
-          el.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const id = el.dataset.id;
-            const title = el.dataset.title;
-            
-            const confirmDelete = confirm(
-              `Are you sure you want to delete "${title}"?\n\nThis action cannot be undone.`
-            );
-            
-            if (!confirmDelete) return;
-            
-            try {
-              await apiFetch(`/posts/${id}`, { method: 'DELETE' });
-              loadMyPosts(); // Refresh the list
-              alert('Post deleted successfully');
-            } catch (err) {
-
-              alert('Failed to delete post: ' + (err.body?.message || 'Unknown error'));
-            }
-          });
-        });
+        if (status === 'scheduled') {
+          list.innerHTML = myPosts.map(p => scheduledPostCardHtml(p)).join('');
+          addScheduledPostListeners();
+        } else {
+          list.innerHTML = myPosts.map(p => myPostCardHtml(p)).join('');
+          addPostActionListeners();
+        }
         
       } catch (err) {
-
-        list.innerHTML = `<div class="col-12"><div class="alert alert-danger">Failed to load your posts</div></div>`;
+        list.innerHTML = `<div class="col-12"><div class="alert alert-danger">Failed to load ${status} posts</div></div>`;
       }
     };
-
-    loadMyPosts();
+    
+    // Load scheduled posts with real-time countdown
+    const loadScheduledPosts = async () => {
+      try {
+        const data = await apiFetch('/posts/scheduled/all');
+        const scheduledPosts = data.scheduledPosts || [];
+        
+        // Update scheduled count badge
+        const countBadge = qs('#scheduledCount');
+        if (countBadge) {
+          countBadge.textContent = scheduledPosts.length;
+        }
+        
+        const list = qs('#scheduledPostsList');
+        if (!list) return;
+        
+        if (scheduledPosts.length === 0) {
+          list.innerHTML = `
+            <div class="empty-state">
+              <i class="bi bi-calendar-check"></i>
+              <h4>No scheduled posts</h4>
+              <p>Schedule posts to be published automatically at optimal times</p>
+              <a href="#/editor" class="btn btn-primary mt-3">
+                <i class="bi bi-plus-circle"></i> Create Scheduled Post
+              </a>
+            </div>
+          `;
+          return;
+        }
+        
+        list.innerHTML = scheduledPosts.map(p => scheduledPostCardHtml(p)).join('');
+        addScheduledPostListeners();
+        
+        // Update countdown timers every minute
+        setInterval(() => {
+          updateScheduledCountdowns();
+        }, 60000);
+        
+      } catch (err) {
+        console.error('Failed to load scheduled posts:', err);
+        const list = qs('#scheduledPostsList');
+        if (list) {
+          list.innerHTML = '<div class="alert alert-danger">Failed to load scheduled posts</div>';
+        }
+      }
+    };
+    
+    // Add event listeners for regular posts
+    const addPostActionListeners = () => {
+      qsa('[data-action="view"]').forEach(el => {
+        el.addEventListener('click', () => {
+          const id = el.dataset.id;
+          location.hash = '#/post/' + id;
+        });
+      });
+      
+      qsa('[data-action="edit"]').forEach(el => {
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const id = el.dataset.id;
+          location.hash = '#/post/' + id;
+        });
+      });
+      
+      qsa('[data-action="delete"]').forEach(el => {
+        el.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const id = el.dataset.id;
+          const title = el.dataset.title;
+          
+          const confirmDelete = confirm(
+            `Are you sure you want to delete "${title}"?\n\nThis action cannot be undone.`
+          );
+          
+          if (!confirmDelete) return;
+          
+          try {
+            await apiFetch(`/posts/${id}`, { method: 'DELETE' });
+            loadCurrentTab();
+            alert('Post deleted successfully');
+          } catch (err) {
+            alert('Failed to delete post: ' + (err.message || 'Unknown error'));
+          }
+        });
+      });
+    };
+    
+    // Add event listeners for scheduled posts
+    const addScheduledPostListeners = () => {
+      qsa('[data-action="cancel-schedule"]').forEach(el => {
+        el.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const id = el.dataset.id;
+          const title = el.dataset.title;
+          
+          const confirmCancel = confirm(
+            `Cancel scheduled publication of "${title}"?\n\nThe post will be saved as a draft instead.`
+          );
+          
+          if (!confirmCancel) return;
+          
+          try {
+            await apiFetch(`/posts/${id}/cancel-schedule`, { method: 'POST' });
+            loadScheduledPosts();
+            alert('Scheduled post cancelled and saved as draft');
+          } catch (err) {
+            alert('Failed to cancel schedule: ' + (err.message || 'Unknown error'));
+          }
+        });
+      });
+      
+      qsa('[data-action="reschedule"]').forEach(el => {
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const id = el.dataset.id;
+          const title = el.dataset.title;
+          const currentTime = el.dataset.scheduledAt;
+          
+          const newTime = prompt(
+            `Reschedule "${title}"\n\nCurrent: ${new Date(currentTime).toLocaleString()}\n\nEnter new date and time (YYYY-MM-DD HH:MM):`,
+            new Date(currentTime).toISOString().slice(0, 16).replace('T', ' ')
+          );
+          
+          if (!newTime) return;
+          
+          const newDateTime = new Date(newTime);
+          if (newDateTime <= new Date()) {
+            alert('Scheduled time must be in the future');
+            return;
+          }
+          
+          reschedulePost(id, newDateTime.toISOString());
+        });
+      });
+    };
+    
+    // Reschedule a post
+    const reschedulePost = async (postId, newDateTime) => {
+      try {
+        await apiFetch(`/posts/${postId}/reschedule`, {
+          method: 'PUT',
+          body: JSON.stringify({ scheduledAt: newDateTime })
+        });
+        loadScheduledPosts();
+        alert(`Post rescheduled for ${new Date(newDateTime).toLocaleString()}`);
+      } catch (err) {
+        alert('Failed to reschedule post: ' + (err.message || 'Unknown error'));
+      }
+    };
+    
+    // Update countdown timers
+    const updateScheduledCountdowns = () => {
+      qsa('.countdown-timer').forEach(el => {
+        const scheduledTime = new Date(el.dataset.scheduledAt);
+        const now = new Date();
+        const diff = scheduledTime.getTime() - now.getTime();
+        
+        if (diff <= 0) {
+          el.innerHTML = '<span class="text-success"><i class="bi bi-check-circle"></i> Ready to publish</span>';
+          return;
+        }
+        
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        
+        let timeString = '';
+        if (days > 0) timeString += `${days}d `;
+        if (hours > 0) timeString += `${hours}h `;
+        timeString += `${minutes}m`;
+        
+        el.innerHTML = `<i class="bi bi-clock"></i> ${timeString} remaining`;
+      });
+    };
+    
+    // Load current active tab
+    const loadCurrentTab = () => {
+      const activeTab = qs('.nav-link.active');
+      if (activeTab) {
+        const tabId = activeTab.id.replace('-tab', '');
+        if (tabId === 'scheduled') {
+          loadScheduledPosts();
+        } else {
+          loadPostsByStatus(tabId);
+        }
+      }
+    };
+    
+    // Tab click handlers
+    qs('#published-tab').addEventListener('click', () => loadPostsByStatus('published'));
+    qs('#draft-tab').addEventListener('click', () => loadPostsByStatus('draft'));
+    qs('#scheduled-tab').addEventListener('click', () => loadScheduledPosts());
+    
+    // Initial load
+    loadPostsByStatus('published');
+    loadScheduledPosts(); // Load to get count
   }
 
   function myPostCardHtml(p) {
@@ -1518,12 +3096,16 @@
           <div class="post-image" data-action="view" data-id="${escapeHtml(p._id)}" style="cursor: pointer;">
             <img src="${(() => {
               const fallback = 'https://picsum.photos/800/500?random=' + encodeURIComponent(p._id || Math.random());
-              if (!p.image) return fallback;
-              try {
-                if (/^https?:\/\//.test(p.image)) return p.image;
-                if (p.image.startsWith('/')) return API_ORIGIN + p.image;
-                return API_ORIGIN + '/uploads/' + encodeURIComponent(p.image);
-              } catch(e) { return fallback; }
+              
+              // Check if post has a cover photo using post ID
+              if (p.image) {
+                const coverPhotoUrl = API_ORIGIN + '/uploads/post-' + p._id + '.jpg';
+                console.log('📸 [My Posts] Using cover photo for', p.title + ':', coverPhotoUrl);
+                return coverPhotoUrl;
+              }
+              
+              console.log('📸 [My Posts] No cover photo for post:', p.title, '- using fallback');
+              return fallback;
             })()}" alt="${escapeHtml(p.title)}" onerror="this.onerror=null;this.src='https://picsum.photos/800/500?random=${escapeHtml(p._id||Math.random())}'" />
           </div>
           <div class="post-category">${escapeHtml(category)}</div>
@@ -1545,14 +3127,82 @@
         </div>
         <div class="card-footer">
           <div class="author-area">
-            <div class="small text-muted">
-              <i class="bi bi-calendar3"></i> ${formatDate(p.publishedAt||p.createdAt)}
-              ${p.published ? '<span class="badge bg-success ms-2">Published</span>' : '<span class="badge bg-secondary ms-2">Draft</span>'}
+            <div class="author-avatar small">${escapeHtml((p.author?.username || 'U').charAt(0).toUpperCase())}</div>
+            <div>
+              <div style="font-weight:600">${escapeHtml(p.author?.username || 'Anonymous')}</div>
+              <div style="font-size:0.85rem;color:var(--text-secondary)">
+                ${formatDate(p.publishedAt||p.createdAt)}
+                ${p.status === 'published' ? '<span class="badge bg-success ms-1">Published</span>' : p.status === 'scheduled' ? '<span class="badge bg-warning ms-1">Scheduled</span>' : '<span class="badge bg-secondary ms-1">Draft</span>'}
+              </div>
             </div>
           </div>
           <div style="display:flex;gap:0.75rem;align-items:center">
             <div class="stat-item"><i class="bi bi-heart-fill" style="color:#ef4444"></i> <span>${p.likes?.length||0}</span></div>
             <div class="stat-item"><i class="bi bi-chat-dots-fill"></i> <span>${p.commentsCount||0}</span></div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  
+  function scheduledPostCardHtml(p) {
+    const excerpt = (p.content || '').replace(/<[^>]+>/g,'').slice(0,150);
+    const category = (p.tags && p.tags[0]) || 'Article';
+    const scheduledDate = new Date(p.scheduledAt);
+    const now = new Date();
+    const timeRemaining = scheduledDate.getTime() - now.getTime();
+    
+    // Calculate countdown
+    let countdownHtml = '';
+    if (timeRemaining <= 0) {
+      countdownHtml = '<span class="text-success"><i class="bi bi-check-circle"></i> Ready to publish</span>';
+    } else {
+      const days = Math.floor(timeRemaining / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
+      
+      let timeString = '';
+      if (days > 0) timeString += `${days}d `;
+      if (hours > 0) timeString += `${hours}h `;
+      timeString += `${minutes}m`;
+      
+      countdownHtml = `<i class="bi bi-clock"></i> ${timeString} remaining`;
+    }
+
+    return `
+      <div class="card mb-3" style="border-left: 4px solid #6f42c1;">
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-8">
+              <h5 class="card-title mb-2">${escapeHtml(p.title)}</h5>
+              <p class="card-text text-muted mb-3">${escapeHtml(excerpt)}${excerpt.length >= 150 ? '...' : ''}</p>
+              <div class="d-flex flex-wrap gap-1 mb-2">
+                ${(p.tags || []).map(tag => `<span class="badge bg-light text-dark">${escapeHtml(tag)}</span>`).join('')}
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="text-end">
+                <div class="mb-3">
+                  <small class="text-muted d-block">Scheduled for:</small>
+                  <strong class="text-primary">${scheduledDate.toLocaleDateString()}</strong><br>
+                  <strong class="text-primary">${scheduledDate.toLocaleTimeString()}</strong>
+                </div>
+                <div class="mb-3">
+                  <small class="countdown-timer text-success" data-scheduled-at="${p.scheduledAt}">
+                    ${countdownHtml}
+                  </small>
+                </div>
+                <div class="dropdown">
+                  <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    <i class="bi bi-gear"></i> Actions
+                  </button>
+                  <ul class="dropdown-menu">
+                    <li><button class="dropdown-item" data-action="reschedule" data-id="${escapeHtml(p._id)}" data-title="${escapeHtml(p.title)}" data-scheduled-at="${p.scheduledAt}"><i class="bi bi-calendar3"></i> Reschedule</button></li>
+                    <li><button class="dropdown-item text-warning" data-action="cancel-schedule" data-id="${escapeHtml(p._id)}" data-title="${escapeHtml(p.title)}"><i class="bi bi-x-circle"></i> Cancel Schedule</button></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1703,21 +3353,251 @@
     // Replace title with input
     postTitle.innerHTML = `<input type="text" id="editTitle" class="form-control form-control-lg" value="${escapeHtml(originalTitle)}">`;
     
-    // Replace content with editable div
+    // Replace content with clean editable area and elegant formatting toolbar
     postContent.innerHTML = `
-      <div class="editor-toolbar mb-2" style="background: var(--light-bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem; display: flex; gap: 0.5rem;">
-        <button type="button" class="editor-btn" title="Bold" onclick="document.execCommand('bold')"><i class="bi bi-type-bold"></i></button>
-        <button type="button" class="editor-btn" title="Italic" onclick="document.execCommand('italic')"><i class="bi bi-type-italic"></i></button>
-        <button type="button" class="editor-btn" title="Heading" onclick="document.execCommand('formatBlock', false, 'h2')"><i class="bi bi-type-h2"></i></button>
-        <button type="button" class="editor-btn" title="List" onclick="document.execCommand('insertUnorderedList')"><i class="bi bi-list-ul"></i></button>
+      <!-- Elegant Formatting Toolbar -->
+      <div class="editor-toolbar mb-3 p-3 rounded-3 shadow-sm" style="background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%); border: 1px solid #e3e6ea;">
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <div class="btn-group btn-group-sm" role="group">
+            <button type="button" class="btn btn-outline-primary" onclick="document.execCommand('bold')" title="Bold (Ctrl+B)">
+              <i class="bi bi-type-bold"></i>
+            </button>
+            <button type="button" class="btn btn-outline-primary" onclick="document.execCommand('italic')" title="Italic (Ctrl+I)">
+              <i class="bi bi-type-italic"></i>
+            </button>
+            <button type="button" class="btn btn-outline-primary" onclick="document.execCommand('underline')" title="Underline (Ctrl+U)">
+              <i class="bi bi-type-underline"></i>
+            </button>
+          </div>
+          
+          <div class="vr"></div>
+          
+          <div class="btn-group btn-group-sm" role="group">
+            <button type="button" class="btn btn-outline-info" onclick="document.execCommand('justifyLeft')" title="Align Left">
+              <i class="bi bi-text-left"></i>
+            </button>
+            <button type="button" class="btn btn-outline-info" onclick="document.execCommand('justifyCenter')" title="Center">
+              <i class="bi bi-text-center"></i>
+            </button>
+            <button type="button" class="btn btn-outline-info" onclick="document.execCommand('justifyRight')" title="Align Right">
+              <i class="bi bi-text-right"></i>
+            </button>
+          </div>
+          
+          <div class="vr"></div>
+          
+          <div class="btn-group btn-group-sm" role="group">
+            <button type="button" class="btn btn-outline-success" onclick="document.execCommand('insertUnorderedList')" title="Bullet List">
+              <i class="bi bi-list-ul"></i>
+            </button>
+            <button type="button" class="btn btn-outline-success" onclick="document.execCommand('insertOrderedList')" title="Numbered List">
+              <i class="bi bi-list-ol"></i>
+            </button>
+          </div>
+          
+          <div class="vr"></div>
+          
+          <div class="btn-group btn-group-sm" role="group">
+            <button type="button" class="btn btn-outline-warning" onclick="document.execCommand('formatBlock', false, 'h2')" title="Heading">
+              <i class="bi bi-type-h2"></i>
+            </button>
+            <button type="button" class="btn btn-outline-secondary" onclick="document.execCommand('formatBlock', false, 'p')" title="Paragraph">
+              <i class="bi bi-paragraph"></i>
+            </button>
+          </div>
+          
+          <div class="vr"></div>
+          
+          <button type="button" class="btn btn-outline-danger btn-sm" onclick="document.execCommand('createLink', true)" title="Insert Link">
+            <i class="bi bi-link-45deg"></i>
+          </button>
+        </div>
       </div>
-      <div id="editContent" contenteditable="true" class="border rounded p-3" style="min-height: 300px; outline: none; border: 2px solid var(--border); transition: border-color 0.2s ease;">${originalContent}</div>
       
+      <div id="editContent" contenteditable="true" class="border rounded-3 p-3 shadow-sm" style="min-height: 300px; outline: none; border: 2px solid #e9ecef !important; transition: all 0.3s ease; font-family: 'Segoe UI', system-ui, sans-serif; font-size: 16px; line-height: 1.6; background: #ffffff;" onFocus="this.style.borderColor='#0d6efd'; this.style.boxShadow='0 0 0 0.2rem rgba(13, 110, 253, 0.25)'" onBlur="this.style.borderColor='#e9ecef'; this.style.boxShadow='none'">${originalContent}</div>
+
+      <!-- Inline Cover Photo + AI Sections (render immediately in edit mode) -->
+      <!-- Cover Photo Section -->
+      <div class="cover-photo-section mb-4" id="editCoverPhotoSection" style="border: 2px dashed #28a745; border-radius: 16px; padding: 24px; background: linear-gradient(135deg, #f8fff8 0%, #f0f9f0 100%); box-shadow: 0 4px 6px rgba(40, 167, 69, 0.1); display: block; visibility: visible; opacity: 1; position: relative; z-index: 1;">
+        <div class="d-flex align-items-center mb-3">
+          <div class="me-3 p-2 rounded-circle" style="background: rgba(40, 167, 69, 0.1);">
+            <i class="bi bi-image" style="font-size: 1.2rem; color: #28a745;"></i>
+          </div>
+          <div>
+            <h5 class="mb-0 fw-bold" style="color: #28a745;">Cover Photo</h5>
+            <small class="text-muted">Choose and crop the perfect image for your post</small>
+          </div>
+        </div>
+        
+        <!-- Image Cropping Area -->
+        <div id="editCropperContainer" class="mb-3" style="display: none;">
+          <div class="text-center mb-3">
+            <h6 class="text-primary"><i class="bi bi-crop"></i> Crop Your Cover Photo</h6>
+            <small class="text-muted">Click and drag the image to position it perfectly. Use the controls below to adjust the crop.</small>
+          </div>
+          
+          <!-- Crop Controls -->
+          <div class="mb-3">
+            <div class="row g-2">
+              <div class="col-auto">
+                <button type="button" id="editCropWider" class="btn btn-outline-primary btn-sm">
+                  <i class="bi bi-arrows-expand"></i> Wider
+                </button>
+              </div>
+              <div class="col-auto">
+                <button type="button" id="editCropNarrower" class="btn btn-outline-primary btn-sm">
+                  <i class="bi bi-arrows-collapse"></i> Narrower
+                </button>
+              </div>
+              <div class="col-auto">
+                <button type="button" id="editCropCenter" class="btn btn-outline-secondary btn-sm">
+                  <i class="bi bi-crosshair"></i> Center
+                </button>
+              </div>
+              <div class="col-auto">
+                <button type="button" id="editCropFitAll" class="btn btn-outline-info btn-sm">
+                  <i class="bi bi-aspect-ratio"></i> Fit All
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <div class="row">
+            <div class="col-md-8">
+              <div id="editImageContainer" style="position: relative; max-width: 100%; max-height: 500px; overflow: hidden; border: 2px solid #dee2e6; border-radius: 8px; background: #f8f9fa; cursor: move;">
+                <img id="editCropperImage" src="" style="max-width: 100%; display: block;" />
+                <div id="editCropOverlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none;">
+                  <div style="position: absolute; border: 3px solid #007bff; border-radius: 4px; box-shadow: 0 0 0 2000px rgba(0,0,0,0.3);" id="editCropBox"></div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="crop-controls">
+                <h6 class="mb-2"><i class="bi bi-eye"></i> Preview (Post Card)</h6>
+                <div id="editCropPreview" style="width: 100%; max-width: 280px; height: 200px; border: 3px solid #28a745; border-radius: 8px; overflow: hidden; background: #f3f4f6; margin-bottom: 15px;">
+                  <img id="editPreviewImg" src="" style="width: 100%; height: 100%; object-fit: cover;" />
+                </div>
+                <small class="text-success d-block mb-3">
+                  <i class="bi bi-info-circle"></i> This is exactly how your image will appear in the post card
+                </small>
+                <div class="d-grid gap-2">
+                  <button id="editApplyCrop" class="btn btn-success">
+                    <i class="bi bi-check-circle"></i> Apply This Crop
+                  </button>
+                  <button id="editResetCrop" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-clockwise"></i> Start Over
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Final Cover Photo Preview -->
+        <div id="editCoverPhotoPreview" class="mb-3" style="display: none;">
+          <div class="position-relative" style="max-width: 420px;">
+            <img id="editCoverPhotoImg" src="" alt="Cover photo preview" 
+                 style="width: 100%; height: 200px; object-fit: cover; border-radius: 8px; border: 2px solid #28a745; background: #f3f4f6;" />
+            <div class="position-absolute" style="top: 5px; right: 5px;">
+              <button type="button" id="editEditCoverPhoto" 
+                      class="btn btn-sm btn-primary me-1" 
+                      style="width: 35px; height: 35px; border-radius: 50%; padding: 0;"
+                      title="Edit/Crop photo">
+                <i class="bi bi-crop"></i>
+              </button>
+              <button type="button" id="editRemoveCoverPhoto" 
+                      class="btn btn-sm btn-danger" 
+                      style="width: 35px; height: 35px; border-radius: 50%; padding: 0;"
+                      title="Remove cover photo">
+                <i class="bi bi-x"></i>
+              </button>
+            </div>
+          </div>
+          <small class="text-success d-block mt-2"><i class="bi bi-check-circle"></i> Cover photo ready! This will appear as your post's main image.</small>
+        </div>
+        
+        <!-- Upload Section -->
+        <div id="editCoverPhotoUpload">
+          <input id="editCoverPhotoInput" type="file" accept="image/*" class="d-none" />
+          <button type="button" id="editCoverPhotoBtn" class="btn btn-outline-success btn-sm">
+            <i class="bi bi-camera"></i> Choose Cover Photo
+          </button>
+          <small class="text-muted ms-2">Upload and crop to fit your post perfectly</small>
+        </div>
+        
+        <!-- Loading State -->
+        <div id="editCoverPhotoUploading" class="d-none">
+          <div class="d-flex align-items-center">
+            <div class="spinner-border spinner-border-sm text-success me-2" role="status"></div>
+            <span class="text-success">Uploading cover photo...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Enhancement Panel -->
+      <div class="ai-enhancement-panel mb-4" id="editAIPanel" style="border: 2px solid #6f42c1; border-radius: 16px; padding: 24px; background: linear-gradient(135deg, #faf9ff 0%, #f5f3ff 100%); box-shadow: 0 4px 6px rgba(111, 66, 193, 0.1); display: block; visibility: visible; opacity: 1; position: relative; z-index: 1;">
+        <div class="d-flex align-items-center mb-3">
+          <div class="me-3 p-2 rounded-circle" style="background: rgba(111, 66, 193, 0.1);">
+            <i class="bi bi-robot" style="font-size: 1.2rem; color: #6f42c1;"></i>
+          </div>
+          <div>
+            <h5 class="mb-0 fw-bold" style="color: #6f42c1;">AI Content Assistant</h5>
+            <small class="text-muted">Enhance your content with AI-powered tools</small>
+          </div>
+        </div>
+        
+        <div class="row g-2 mb-3">
+          <div class="col-md-4">
+            <button id="editGenerateHeadingBtn" class="btn btn-outline-primary btn-sm w-100" 
+                    title="AI will analyze your content and create a compelling title">
+              <i class="bi bi-lightbulb"></i> Generate Title
+            </button>
+          </div>
+          <div class="col-md-4">
+            <button id="editCheckSpellingBtn" class="btn btn-outline-success btn-sm w-100"
+                    title="Check for spelling and grammar errors">
+              <i class="bi bi-check2-circle"></i> Check Spelling
+            </button>
+          </div>
+          <div class="col-md-4">
+            <button id="editEnhanceContentBtn" class="btn btn-outline-info btn-sm w-100"
+                    title="Get comprehensive AI analysis: SEO score, suggestions, and metrics">
+              <i class="bi bi-stars"></i> Full Analysis
+            </button>
+          </div>
+        </div>
+        
+        <!-- AI Results Area -->
+        <div id="editAiResultsArea" class="ai-results" style="display: none;"></div>
+        
+        <!-- Scheduling Section -->
+        <div class="scheduling-section mt-3 p-3" style="background: rgba(255, 255, 255, 0.7); border-radius: 8px; border-left: 4px solid #6f42c1;">
+          <h6 class="mb-2"><i class="bi bi-calendar-check"></i> Smart Scheduling</h6>
+          <div class="row g-2">
+            <div class="col-md-8">
+              <input type="datetime-local" id="editScheduledDateTime" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-4">
+              <button id="editSuggestTimeBtn" class="btn btn-outline-secondary btn-sm w-100">
+                <i class="bi bi-clock"></i> Suggest Time
+              </button>
+            </div>
+          </div>
+          <small class="text-muted d-block mt-1">Leave empty to publish immediately</small>
+        </div>
+      </div>
+
       <!-- Action Buttons -->
-      <div class="d-flex gap-3 justify-content-center mt-4" id="editActionButtons">
+      <div class="d-flex gap-2 mb-4">
+        <button id="editSaveDraftBtn" class="btn btn-outline-primary flex-fill" data-post-id="${escapeHtml(post._id)}">
+          <i class="bi bi-save"></i> Save Draft
+        </button>
+        <button id="editSmartScheduleBtn" class="btn btn-outline-success flex-fill" data-post-id="${escapeHtml(post._id)}">
+          <i class="bi bi-calendar-check"></i> Smart Schedule
+        </button>
         <button type="button" 
                 id="repostBtn" 
-                class="btn btn-success btn-lg px-4" 
+                class="btn btn-success flex-fill" 
                 style="font-weight: 600; cursor: pointer; pointer-events: auto !important; position: relative; z-index: 1000;"
                 onclick="if(window.handleRepostClick){window.handleRepostClick(event);} return false;"
                 data-post-id="${escapeHtml(post._id)}">
@@ -1725,7 +3605,7 @@
         </button>
         <button type="button" 
                 id="cancelEditBtn" 
-                class="btn btn-outline-secondary btn-lg px-4" 
+                class="btn btn-outline-secondary flex-fill" 
                 style="cursor: pointer; pointer-events: auto !important;"
                 onclick="if(window.handleCancelEdit){window.handleCancelEdit(event);} return false;"
                 data-post-id="${escapeHtml(post._id)}">
@@ -1734,8 +3614,77 @@
       </div>
     `;
     
-    // Replace tags with input
-    tagsContainer.innerHTML = `<input type="text" id="editTags" class="form-control mb-3" placeholder="Add tags (comma separated)" value="${escapeHtml(originalTags.join(', '))}">`;
+    // Replace tags with input and add wrapper for better targeting
+    tagsContainer.innerHTML = `
+      <div id="editTagsContainer" class="mb-3">
+        <input type="text" id="editTags" class="form-control" placeholder="Add tags (comma separated)" value="${escapeHtml(originalTags.join(', '))}">
+      </div>
+    `;
+    
+    // Previously duplicated HTML removed: cover photo and AI are inlined above.
+    // Cover photo and AI sections are inlined above in `postContent.innerHTML`.
+    // No delayed insertion required.
+    
+    // Initialize cover photo functionality for edit mode
+    initEditCoverPhotoFunctionality(post);
+    
+    // Initialize AI functionality for edit mode
+    initEditAIFunctionality();
+
+    // Explicit fallback bindings to ensure edit-mode controls are interactive
+    // Attach after a short delay so DOM is fully parsed and handlers inside init* have run
+    setTimeout(() => {
+      try {
+        // Open file input for various buttons that trigger choosing a cover photo
+        ['#editCoverPhotoBtn', '#editEditCoverPhoto', '#editCoverPhotoBtnAlt'].forEach(sel => {
+          const btn = qs(sel);
+          if (btn) {
+            btn.addEventListener('click', (e) => {
+              e.preventDefault(); e.stopPropagation();
+              const fi = qs('#editCoverPhotoInput');
+              if (fi) fi.click();
+              console.log('Fallback: clicked', sel, '-> opened file input');
+            });
+          }
+        });
+
+        // Ensure apply crop triggers upload flow (calls existing handler if attached)
+        const applyBtn = qs('#editApplyCrop');
+        if (applyBtn) {
+          applyBtn.addEventListener('click', (e) => {
+            console.log('Fallback: editApplyCrop clicked');
+            // If an inline handler exists it will run; otherwise delegation/upload will handle it
+          });
+        }
+
+        // Remove cover photo explicit binding
+        const removeBtn = qs('#editRemoveCoverPhoto');
+        if (removeBtn) {
+          removeBtn.addEventListener('click', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            const preview = qs('#editCoverPhotoPreview'); if (preview) preview.style.display = 'none';
+            window._editCoverPhotoFilename = null; window._editHasCoverPhoto = false; window._editRemoveCoverPhoto = true;
+            console.log('Fallback: edit cover photo removed');
+          });
+        }
+
+        // AI buttons: ensure they call their functions even if direct listeners failed
+        const aiMap = [
+          ['#editGenerateHeadingBtn', () => { if (typeof editGenerateHeading === 'function') editGenerateHeading(); }],
+          ['#editCheckSpellingBtn', () => { if (typeof editCheckSpelling === 'function') editCheckSpelling(); }],
+          ['#editEnhanceContentBtn', () => { if (typeof editEnhanceContent === 'function') editEnhanceContent(); }],
+          ['#editSuggestTimeBtn', () => { if (typeof editSuggestOptimalTime === 'function') editSuggestOptimalTime(); }]
+        ];
+        aiMap.forEach(([sel, fn]) => {
+          const b = qs(sel);
+          if (b) {
+            b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); try { fn(); console.log('Fallback: AI button', sel, 'invoked'); } catch (err) { console.error('Fallback AI handler error for', sel, err); } });
+          }
+        });
+      } catch (err) {
+        console.error('Error attaching fallback edit handlers:', err);
+      }
+    }, 120);
     
     // Replace edit button with smaller top buttons
     const editBtn = qs('#editBtn');
@@ -2019,6 +3968,471 @@
     }
   }
 
+  async function renderMonetizationView() {
+    const container = qs('#app');
+    const user = JSON.parse(localStorage.getItem('me') || 'null');
+    
+    if (!user) {
+      location.hash = '#/login';
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="container py-5">
+        <div class="row">
+          <div class="col-lg-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+              <h2 class="section-title mb-0"><i class="bi bi-cash-coin"></i> Creator Earnings</h2>
+              <div class="text-end">
+                <small class="text-muted">Reading-time based revenue</small><br>
+                <small class="badge bg-success">YouTube-style monetization</small>
+              </div>
+            </div>
+
+            <!-- Loading placeholder -->
+            <div id="monetizationLoading" class="text-center py-5">
+              <div class="loading-spinner"></div>
+              <p class="mt-3 text-muted">Loading your earnings dashboard...</p>
+            </div>
+
+            <!-- Dashboard content (hidden initially) -->
+            <div id="monetizationContent" style="display: none;">
+              <!-- Combined Overview Cards -->
+              <div class="row mb-4">
+                <div class="col-md-3 mb-3">
+                  <div class="card border-success">
+                    <div class="card-body text-center">
+                      <i class="bi bi-currency-dollar fs-1 text-success mb-2"></i>
+                      <h4 id="totalEarnings" class="mb-1">$0.00</h4>
+                      <small class="text-muted">Total Earnings</small>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                  <div class="card border-info">
+                    <div class="card-body text-center">
+                      <i class="bi bi-clock fs-1 text-info mb-2"></i>
+                      <h4 id="totalReadingTime" class="mb-1">0h</h4>
+                      <small class="text-muted">Total Reading Time</small>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                  <div class="card border-warning">
+                    <div class="card-body text-center">
+                      <i class="bi bi-eye fs-1 text-warning mb-2"></i>
+                      <h4 id="totalViews" class="mb-1">0</h4>
+                      <small class="text-muted">Total Views</small>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                  <div class="card border-primary">
+                    <div class="card-body text-center">
+                      <i class="bi bi-file-earmark-text fs-1 text-primary mb-2"></i>
+                      <h4 id="eligiblePosts" class="mb-1">0</h4>
+                      <small class="text-muted">Eligible Posts</small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Dual Earnings System Tabs -->
+              <ul class="nav nav-pills mb-4" id="earningsTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link active" id="author-tab" data-bs-toggle="pill" data-bs-target="#authorEarnings" type="button" role="tab">
+                    <i class="bi bi-pen-fill"></i> Author Earnings
+                  </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link" id="reader-tab" data-bs-toggle="pill" data-bs-target="#readerEarnings" type="button" role="tab">
+                    <i class="bi bi-book"></i> Reader Earnings
+                  </button>
+                </li>
+              </ul>
+
+              <!-- Tab Content -->
+              <div class="tab-content" id="earningsTabContent">
+                <!-- Author Earnings Tab -->
+                <div class="tab-pane fade show active" id="authorEarnings" role="tabpanel">
+                  <div class="row mb-4">
+                    <div class="col-md-6">
+                      <div class="card">
+                        <div class="card-header">
+                          <h5 class="mb-0"><i class="bi bi-trophy"></i> Author Status</h5>
+                        </div>
+                        <div class="card-body">
+                          <div id="authorEligibilityStatus">
+                            <div class="text-center py-3">
+                              <div class="loading-spinner"></div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <div class="card">
+                        <div class="card-header">
+                          <h5 class="mb-0"><i class="bi bi-cash-stack"></i> Author Earnings</h5>
+                        </div>
+                        <div class="card-body text-center">
+                          <h3 id="authorEarnings" class="text-success mb-2">$0.00</h3>
+                          <p class="text-muted">From your published content</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Top Posts -->
+                  <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                      <h5 class="mb-0"><i class="bi bi-graph-up"></i> Your Top Earning Posts</h5>
+                      <button class="btn btn-sm btn-outline-primary" onclick="loadAuthorAnalytics()">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                      </button>
+                    </div>
+                    <div class="card-body">
+                      <div id="authorTopPosts">
+                        <div class="text-center py-3">
+                          <div class="loading-spinner"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Reader Earnings Tab -->
+                <div class="tab-pane fade" id="readerEarnings" role="tabpanel">
+                  <div class="row mb-4">
+                    <div class="col-md-6">
+                      <div class="card">
+                        <div class="card-header">
+                          <h5 class="mb-0"><i class="bi bi-shield-check"></i> Reader Status</h5>
+                        </div>
+                        <div class="card-body">
+                          <div id="readerEligibilityStatus">
+                            <div class="text-center py-3">
+                              <div class="loading-spinner"></div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <div class="card">
+                        <div class="card-header">
+                          <h5 class="mb-0"><i class="bi bi-piggy-bank"></i> Reader Earnings</h5>
+                        </div>
+                        <div class="card-body text-center">
+                          <h3 id="readerEarnings" class="text-info mb-2">$0.00</h3>
+                          <p class="text-muted">From reading & engaging</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Reader Analytics -->
+                  <div class="card">
+                    <div class="card-header">
+                      <h5 class="mb-0"><i class="bi bi-activity"></i> Your Reading Activity</h5>
+                    </div>
+                    <div class="card-body">
+                      <div class="row">
+                        <div class="col-md-3 text-center mb-3">
+                          <i class="bi bi-clock-history fs-1 text-info"></i>
+                          <h4 id="readerReadingTime" class="mt-2">0h</h4>
+                          <small class="text-muted">Reading Time</small>
+                        </div>
+                        <div class="col-md-3 text-center mb-3">
+                          <i class="bi bi-heart-fill fs-1 text-danger"></i>
+                          <h4 id="readerEngagements" class="mt-2">0</h4>
+                          <small class="text-muted">Engagements</small>
+                        </div>
+                        <div class="col-md-3 text-center mb-3">
+                          <i class="bi bi-calendar-check fs-1 text-success"></i>
+                          <h4 id="readerActiveDays" class="mt-2">0</h4>
+                          <small class="text-muted">Active Days</small>
+                        </div>
+                        <div class="col-md-3 text-center mb-3">
+                          <i class="bi bi-fire fs-1 text-warning"></i>
+                          <h4 id="readerStreak" class="mt-2">0</h4>
+                          <small class="text-muted">Day Streak</small>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Revenue Rate Info -->
+              <div class="card mb-4">
+                <div class="card-header">
+                  <h5 class="mb-0"><i class="bi bi-info-circle"></i> Dual Earnings System</h5>
+                </div>
+                <div class="card-body">
+                  <div class="row">
+                    <div class="col-md-6">
+                      <h6 class="text-primary"><i class="bi bi-pen-fill"></i> Author Earnings</h6>
+                      <p class="mb-3"><strong>$4 per 1000 reading hours</strong> on your content<br>
+                      <small class="text-muted">+ Quality & engagement bonuses</small></p>
+                      <ul class="list-unstyled small text-muted">
+                        <li>• Need 5+ posts published</li>
+                        <li>• Need 50+ hours reading time</li>
+                        <li>• Need 500+ total views</li>
+                      </ul>
+                    </div>
+                    <div class="col-md-6">
+                      <h6 class="text-info"><i class="bi bi-book"></i> Reader Earnings</h6>
+                      <p class="mb-3"><strong>$1.5 per 1000 reading hours</strong> on any content<br>
+                      <small class="text-muted">+ Engagement & consistency bonuses</small></p>
+                      <ul class="list-unstyled small text-muted">
+                        <li>• Need 20+ hours reading time</li>
+                        <li>• Need 10+ engagements (likes/comments)</li>
+                        <li>• Need 7+ active days</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Payment Settings -->
+              <div class="card">
+                <div class="card-header">
+                  <h5 class="mb-0"><i class="bi bi-credit-card"></i> Payment Settings</h5>
+                </div>
+                <div class="card-body">
+                  <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    <strong>Payment Information:</strong> Payments are processed monthly for earnings above $10. 
+                    Add your payment details to start receiving earnings.
+                  </div>
+                  <div id="paymentSettingsForm">
+                    <div class="row">
+                      <div class="col-md-6 mb-3">
+                        <label class="form-label">Payment Method</label>
+                        <select class="form-select" id="paymentMethod">
+                          <option value="">Select payment method</option>
+                          <option value="paypal">PayPal</option>
+                          <option value="bank">Bank Transfer</option>
+                          <option value="stripe">Stripe</option>
+                        </select>
+                      </div>
+                      <div class="col-md-6 mb-3">
+                        <label class="form-label">Payment Email/Account</label>
+                        <input type="text" class="form-control" id="paymentAccount" placeholder="Enter payment details">
+                      </div>
+                    </div>
+                    <button class="btn btn-success" onclick="savePaymentSettings()">
+                      <i class="bi bi-save"></i> Save Payment Settings
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Load monetization data
+    await loadMonetizationDashboard();
+  }
+
+  async function loadMonetizationDashboard() {
+    try {
+      // Load dashboard data
+      const dashboard = await apiFetch('/monetization/dashboard');
+      
+      // Hide loading, show content
+      qs('#monetizationLoading').style.display = 'none';
+      qs('#monetizationContent').style.display = 'block';
+      
+      // Update combined stats
+      qs('#totalEarnings').textContent = `$${(dashboard.totalEarnings || 0).toFixed(2)}`;
+      qs('#totalReadingTime').textContent = `${dashboard.totalReadingTime || 0}h`;
+      qs('#totalViews').textContent = (dashboard.totalViews || 0).toLocaleString();
+      qs('#eligiblePosts').textContent = dashboard.eligiblePosts || 0;
+      
+      // Update author section
+      const authorEarnings = dashboard.author?.earnings || 0;
+      const authorEligibility = dashboard.author?.eligibility;
+      
+      qs('#authorEarnings').textContent = `$${authorEarnings.toFixed(2)}`;
+      
+      const authorStatusEl = qs('#authorEligibilityStatus');
+      if (authorEligibility?.eligible) {
+        authorStatusEl.innerHTML = `
+          <div class="text-center">
+            <i class="bi bi-check-circle-fill text-success fs-1 mb-2"></i>
+            <h5 class="text-success">Author Eligible!</h5>
+            <p class="text-muted mb-0">You're earning from your published content</p>
+          </div>
+        `;
+      } else {
+        const reqs = authorEligibility?.requirements || {};
+        authorStatusEl.innerHTML = `
+          <div class="text-center">
+            <i class="bi bi-clock-fill text-warning fs-1 mb-2"></i>
+            <h5 class="text-warning">Not Eligible Yet</h5>
+            <div class="text-start mt-3">
+              <small class="text-muted">Requirements:</small>
+              <ul class="list-unstyled small">
+                <li class="${reqs.posts?.met ? 'text-success' : 'text-muted'}">
+                  <i class="bi ${reqs.posts?.met ? 'bi-check-circle-fill' : 'bi-circle'}"></i> 
+                  ${reqs.posts?.current || 0}/${reqs.posts?.required || 5} posts
+                </li>
+                <li class="${reqs.views?.met ? 'text-success' : 'text-muted'}">
+                  <i class="bi ${reqs.views?.met ? 'bi-check-circle-fill' : 'bi-circle'}"></i> 
+                  ${reqs.views?.current || 0}/${reqs.views?.required || 500} views
+                </li>
+                <li class="${reqs.readingHours?.met ? 'text-success' : 'text-muted'}">
+                  <i class="bi ${reqs.readingHours?.met ? 'bi-check-circle-fill' : 'bi-circle'}"></i> 
+                  ${reqs.readingHours?.current || 0}/${reqs.readingHours?.required || 50} reading hours
+                </li>
+              </ul>
+            </div>
+          </div>
+        `;
+      }
+      
+      // Update reader section
+      const readerEarnings = dashboard.reader?.earnings || 0;
+      const readerEligibility = dashboard.reader?.eligibility;
+      const readerAnalytics = dashboard.reader?.analytics || {};
+      
+      qs('#readerEarnings').textContent = `$${readerEarnings.toFixed(2)}`;
+      qs('#readerReadingTime').textContent = `${readerAnalytics.totalReadingTime || 0}h`;
+      qs('#readerEngagements').textContent = readerAnalytics.totalEngagements || 0;
+      qs('#readerActiveDays').textContent = readerAnalytics.activeDays || 0;
+      qs('#readerStreak').textContent = readerAnalytics.dailyStreak || 0;
+      
+      const readerStatusEl = qs('#readerEligibilityStatus');
+      if (readerEligibility?.eligible) {
+        readerStatusEl.innerHTML = `
+          <div class="text-center">
+            <i class="bi bi-check-circle-fill text-success fs-1 mb-2"></i>
+            <h5 class="text-success">Reader Eligible!</h5>
+            <p class="text-muted mb-0">You're earning from reading & engaging</p>
+          </div>
+        `;
+      } else {
+        const reqs = readerEligibility?.requirements || {};
+        readerStatusEl.innerHTML = `
+          <div class="text-center">
+            <i class="bi bi-clock-fill text-info fs-1 mb-2"></i>
+            <h5 class="text-info">Keep Reading!</h5>
+            <div class="text-start mt-3">
+              <small class="text-muted">Requirements:</small>
+              <ul class="list-unstyled small">
+                <li class="${reqs.readingHours?.met ? 'text-success' : 'text-muted'}">
+                  <i class="bi ${reqs.readingHours?.met ? 'bi-check-circle-fill' : 'bi-circle'}"></i> 
+                  ${reqs.readingHours?.current || 0}/${reqs.readingHours?.required || 20} reading hours
+                </li>
+                <li class="${reqs.engagements?.met ? 'text-success' : 'text-muted'}">
+                  <i class="bi ${reqs.engagements?.met ? 'bi-check-circle-fill' : 'bi-circle'}"></i> 
+                  ${reqs.engagements?.current || 0}/${reqs.engagements?.required || 10} engagements
+                </li>
+                <li class="${reqs.activeDays?.met ? 'text-success' : 'text-muted'}">
+                  <i class="bi ${reqs.activeDays?.met ? 'bi-check-circle-fill' : 'bi-circle'}"></i> 
+                  ${reqs.activeDays?.current || 0}/${reqs.activeDays?.required || 7} active days
+                </li>
+              </ul>
+            </div>
+          </div>
+        `;
+      }
+      
+      // Load payment settings
+      const paymentSettings = dashboard.paymentSettings || {};
+      if (qs('#paymentMethod')) {
+        qs('#paymentMethod').value = paymentSettings.method || '';
+        qs('#paymentAccount').value = paymentSettings.account || '';
+      }
+      
+      // Load author's top posts
+      await loadAuthorAnalytics(dashboard.author?.metrics?.topPosts || []);
+      
+    } catch (err) {
+      console.error('Failed to load monetization dashboard:', err);
+      qs('#monetizationLoading').innerHTML = `
+        <div class="alert alert-danger">
+          <i class="bi bi-exclamation-triangle"></i>
+          Failed to load earnings dashboard. Please try again later.
+        </div>
+      `;
+    }
+  }
+
+  async function loadAuthorAnalytics(topPosts = null) {
+    const authorTopPosts = qs('#authorTopPosts');
+    if (!authorTopPosts) return;
+    
+    if (!topPosts) {
+      authorTopPosts.innerHTML = '<div class="text-center py-3"><div class="loading-spinner"></div></div>';
+      
+      try {
+        const analytics = await apiFetch('/monetization/analytics/posts');
+        topPosts = analytics.posts || [];
+      } catch (err) {
+        console.error('Failed to load author analytics:', err);
+        authorTopPosts.innerHTML = '<div class="alert alert-danger">Failed to load post analytics</div>';
+        return;
+      }
+    }
+    
+    if (topPosts.length === 0) {
+      authorTopPosts.innerHTML = `
+        <div class="text-center py-4">
+          <i class="bi bi-file-earmark text-muted" style="font-size: 2rem;"></i>
+          <p class="text-muted mt-2">No posts yet. Start writing to earn from your content!</p>
+          <a href="#/editor" class="btn btn-primary btn-sm mt-2">
+            <i class="bi bi-plus-circle"></i> Create Your First Post
+          </a>
+        </div>
+      `;
+      return;
+    }
+    
+    authorTopPosts.innerHTML = topPosts.map(post => `
+      <div class="d-flex justify-content-between align-items-center border-bottom py-3">
+        <div class="flex-grow-1">
+          <h6 class="mb-1">${escapeHtml(post.title)}</h6>
+          <small class="text-muted">
+            ${post.analytics.views} views • ${Math.floor(post.analytics.totalReadingTime / 3600)}h reading time
+          </small>
+        </div>
+        <div class="text-end">
+          <h6 class="mb-1 text-success">$${(post.analytics.revenue || 0).toFixed(2)}</h6>
+          <small class="text-muted">Rate: $${(post.analytics.revenueRate || 0)}/hour</small>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function savePaymentSettings() {
+    const method = qs('#paymentMethod').value;
+    const account = qs('#paymentAccount').value;
+    
+    if (!method || !account) {
+      alert('Please fill in all payment details');
+      return;
+    }
+    
+    try {
+      await apiFetch('/monetization/payment-settings', {
+        method: 'PUT',
+        body: JSON.stringify({ method, account })
+      });
+      
+      alert('Payment settings saved successfully!');
+    } catch (err) {
+      console.error('Failed to save payment settings:', err);
+      alert('Failed to save payment settings. Please try again.');
+    }
+  }
+
+
+
   function escapeHtml(s){ 
     if(s==null) return ''; 
     return String(s).replace(/[&<>"]+/g, function(c){ 
@@ -2171,10 +4585,26 @@
     
     const updateUrl = `${API_BASE}/posts/${encodeURIComponent(post._id)}`;
     
+    // Handle cover photo changes
+    let coverPhotoPayload = {};
+    if (window._editHasCoverPhoto && window._editCoverPhotoFilename) {
+      // New cover photo uploaded
+      coverPhotoPayload.hasCoverPhoto = true;
+      coverPhotoPayload.tempImageFilename = window._editCoverPhotoFilename;
+      console.log('📸 Edit: Including new cover photo in update:', window._editCoverPhotoFilename);
+    } else if (window._editRemoveCoverPhoto) {
+      // Cover photo removal requested
+      coverPhotoPayload.hasCoverPhoto = false;
+      coverPhotoPayload.tempImageFilename = null;
+      coverPhotoPayload.removeCoverPhoto = true;
+      console.log('📸 Edit: Removing cover photo');
+    }
+    
     const updatePayload = {
       title: editedTitle,
       content: editedContent,
-      tags: editedTags
+      tags: editedTags,
+      ...coverPhotoPayload
     };
     
     const requestOptions = {
@@ -2207,10 +4637,18 @@
         post.title = data.title;
         post.content = data.content;
         post.tags = data.tags || [];
+        post.image = data.image; // Update image field
         if (data._id) {
           post._id = data._id;
         }
       }
+      
+      // Clean up edit cover photo state
+      window._editCoverPhotoFilename = null;
+      window._editHasCoverPhoto = false;
+      window._editRemoveCoverPhoto = false;
+      
+      console.log('📸 Edit cover photo state cleaned up');
       
       exitEditMode(post);
     })
@@ -2287,6 +4725,941 @@
       location.hash = '#/login'; 
     } else {
       alert('Request failed. Please try again.');
+    }
+  }
+
+  // ===================
+  // AI ENHANCEMENT FUNCTIONS
+  // ===================
+
+  // Initialize AI features when page loads
+  function initAIFeatures() {
+    console.log('🤖 Initializing AI features...');
+    
+    const generateHeadingBtn = qs('#generateHeadingBtn');
+    const checkSpellingBtn = qs('#checkSpellingBtn');
+    const enhanceContentBtn = qs('#enhanceContentBtn');
+    const suggestTimeBtn = qs('#suggestTimeBtn');
+
+    if (generateHeadingBtn) {
+      generateHeadingBtn.addEventListener('click', generateHeading);
+      console.log('✅ Generate Heading button connected');
+    }
+    if (checkSpellingBtn) {
+      checkSpellingBtn.addEventListener('click', checkSpelling);
+      console.log('✅ Spell Check button connected');
+    }
+    if (enhanceContentBtn) {
+      enhanceContentBtn.addEventListener('click', enhanceContent);
+      console.log('✅ Enhance Content button connected');
+    }
+    if (suggestTimeBtn) {
+      suggestTimeBtn.addEventListener('click', suggestOptimalTime);
+      console.log('✅ Suggest Time button connected');
+    }
+
+    // Show AI status in the AI panel
+    const aiPanel = qs('.ai-enhancement-panel');
+    if (aiPanel) {
+      const statusEl = document.createElement('small');
+      statusEl.className = 'text-success d-block mt-2';
+      statusEl.innerHTML = '<i class="bi bi-check-circle"></i> AI Assistant Ready';
+      aiPanel.appendChild(statusEl);
+      console.log('🚀 AI features initialized successfully!');
+    }
+  }
+
+  // Generate heading from content
+  async function generateHeading() {
+    const content = getActualEditorContent();
+    const btn = qs('#generateHeadingBtn');
+    
+    if (!content.trim()) {
+      showErrorMessage('No Content', 'Please write some content first before generating a heading');
+      qs('#editor')?.focus();
+      return;
+    }
+
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Generating...';
+
+    try {
+      const response = await fetch(API_BASE + '/ai/generate-heading', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        },
+        body: JSON.stringify({ content: stripHtml(content) })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        const titleInput = qs('#postTitle');
+        if (titleInput) {
+          titleInput.value = data.heading;
+          showSuccessMessage('Title Generated!', 'AI has generated a compelling title for your post');
+        }
+      } else {
+        throw new Error(data.message || 'Failed to generate heading');
+      }
+    } catch (error) {
+      showErrorMessage('Generation Failed', error.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
+  }
+
+  // Check spelling and grammar
+  async function checkSpelling() {
+    const content = getActualEditorContent();
+    const title = qs('#postTitle')?.value || '';
+    const btn = qs('#checkSpellingBtn');
+    
+    if (!content.trim() && !title.trim()) {
+      showErrorMessage('No Content', 'Please write some content or add a title first');
+      qs('#editor')?.focus();
+      return;
+    }
+
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Checking...';
+
+    try {
+      const response = await fetch(API_BASE + '/ai/check-spelling', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        },
+        body: JSON.stringify({ text: stripHtml(title + ' ' + content) })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        displaySpellingResults(data.errors);
+      } else {
+        throw new Error(data.message || 'Failed to check spelling');
+      }
+    } catch (error) {
+      showErrorMessage('Spell Check Failed', error.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
+  }
+
+  // Full content enhancement
+  async function enhanceContent() {
+    const content = getActualEditorContent();
+    const title = qs('#postTitle')?.value || '';
+    const btn = qs('#enhanceContentBtn');
+    
+    if (!content.trim()) {
+      showErrorMessage('No Content', 'Please write some content first before enhancement');
+      qs('#editor')?.focus();
+      return;
+    }
+
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Analyzing...';
+
+    try {
+      const response = await fetch(API_BASE + '/ai/enhance', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        },
+        body: JSON.stringify({ 
+          content: stripHtml(content), 
+          title: title 
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        displayEnhancementResults(data);
+      } else {
+        throw new Error(data.message || 'Failed to enhance content');
+      }
+    } catch (error) {
+      showErrorMessage('Enhancement Failed', error.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
+  }
+
+  // Suggest optimal posting time
+  async function suggestOptimalTime() {
+    const btn = qs('#suggestTimeBtn');
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Analyzing...';
+
+    try {
+      const response = await fetch(API_BASE + '/ai/posting-time', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        }
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        const scheduledInput = qs('#scheduledDateTime');
+        if (scheduledInput) {
+          const recommendedTime = new Date(data.recommended);
+          scheduledInput.value = recommendedTime.toISOString().slice(0, 16);
+        }
+        
+        showSuccessMessage('Optimal Time Suggested!', 
+          `Best time to post: ${new Date(data.recommended).toLocaleString()}\nReason: ${data.reason}`);
+      } else {
+        throw new Error(data.message || 'Failed to suggest time');
+      }
+    } catch (error) {
+      showErrorMessage('Time Suggestion Failed', error.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
+  }
+
+  // Display spelling check results
+  function displaySpellingResults(errors) {
+    const resultsArea = qs('#aiResultsArea');
+    if (!resultsArea) return;
+
+    if (errors.length === 0) {
+      resultsArea.innerHTML = `
+        <div class="alert alert-success">
+          <i class="bi bi-check-circle"></i> Great! No spelling errors found.
+        </div>
+      `;
+    } else {
+      const errorsList = errors.map(error => `
+        <li class="mb-1">
+          <strong>"${error.error}"</strong> → <span class="text-success">"${error.suggestion}"</span>
+          <small class="text-muted">(${error.position})</small>
+        </li>
+      `).join('');
+
+      resultsArea.innerHTML = `
+        <div class="alert alert-warning">
+          <h6><i class="bi bi-exclamation-triangle"></i> Found ${errors.length} spelling issue${errors.length > 1 ? 's' : ''}</h6>
+          <ul class="mb-0 mt-2">${errorsList}</ul>
+        </div>
+      `;
+    }
+    
+    resultsArea.style.display = 'block';
+  }
+
+  // Display full enhancement results
+  function displayEnhancementResults(data) {
+    const resultsArea = qs('#aiResultsArea');
+    if (!resultsArea) return;
+
+    const seoClass = data.seoScore >= 80 ? 'success' : data.seoScore >= 60 ? 'warning' : 'danger';
+    
+    resultsArea.innerHTML = `
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="card border-0" style="background: rgba(255, 255, 255, 0.8);">
+            <div class="card-body p-3">
+              <h6><i class="bi bi-graph-up"></i> Content Metrics</h6>
+              <div class="d-flex justify-content-between mb-1">
+                <span>SEO Score:</span>
+                <span class="badge bg-${seoClass}">${data.seoScore}/100</span>
+              </div>
+              <div class="d-flex justify-content-between mb-1">
+                <span>Word Count:</span>
+                <span>${data.wordCount} words</span>
+              </div>
+              <div class="d-flex justify-content-between">
+                <span>Reading Time:</span>
+                <span>${data.readingTime}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card border-0" style="background: rgba(255, 255, 255, 0.8);">
+            <div class="card-body p-3">
+              <h6><i class="bi bi-lightbulb"></i> Suggestions</h6>
+              ${data.suggestions.length > 0 ? 
+                data.suggestions.slice(0, 3).map(s => `<small class="d-block mb-1">• ${s}</small>`).join('') :
+                '<small class="text-muted">No suggestions at this time</small>'
+              }
+            </div>
+          </div>
+        </div>
+        ${data.spellingErrors.length > 0 ? `
+        <div class="col-12">
+          <div class="alert alert-info mb-0">
+            <strong>Spelling Check:</strong> Found ${data.spellingErrors.length} potential issue${data.spellingErrors.length > 1 ? 's' : ''}
+            ${data.spellingErrors.slice(0, 2).map(e => `<br><small>• "${e.error}" → "${e.suggestion}"</small>`).join('')}
+          </div>
+        </div>
+        ` : ''}
+      </div>
+    `;
+    
+    resultsArea.style.display = 'block';
+
+    // Auto-apply title if none exists
+    if (data.heading && !qs('#postTitle').value) {
+      qs('#postTitle').value = data.heading;
+    }
+  }
+
+  // Helper function to check if content is placeholder text
+  function isPlaceholderContent(content) {
+    if (!content) return true;
+    
+    const cleanContent = content.trim();
+    return cleanContent === '' || 
+           cleanContent === '<p></p>' || 
+           cleanContent === '<p><br></p>' ||
+           content.includes('Try the AI features!') || 
+           content.includes('Insert Sample Blog Content') ||
+           content.includes('Start writing your blog post...');
+  }
+  
+  // Helper function to get actual editor content (excluding placeholder)
+  function getActualEditorContent() {
+    const editor = qs('#editor');
+    if (!editor) return '';
+    
+    const rawContent = editor.innerHTML;
+    return isPlaceholderContent(rawContent) ? '' : rawContent;
+  }
+  
+  // Helper function to strip HTML tags
+  function stripHtml(html) {
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    return temp.textContent || temp.innerText || '';
+  }
+
+  // Robust event-delegation fallback for edit/create controls (fixes timing binding issues)
+  document.addEventListener('click', async (e) => {
+    try {
+      const target = e.target;
+
+      // Edit: open file input when clicking "Choose Cover Photo"
+      if (target.closest && target.closest('#editCoverPhotoBtn')) {
+        const fi = qs('#editCoverPhotoInput');
+        if (fi) fi.click();
+        return;
+      }
+
+      // Edit: apply crop button - if local handler didn't attach, use preview image (dataURL) and upload
+      if (target.closest && target.closest('#editApplyCrop')) {
+        e.preventDefault();
+        const previewImg = qs('#editCoverPhotoImg');
+        if (!previewImg || !previewImg.src) {
+          alert('No cropped preview available. Please crop the image first.');
+          return;
+        }
+
+        // If preview is a data URL, convert to blob; if it's a remote URL, fetch it
+        let blob;
+        try {
+          const res = await fetch(previewImg.src);
+          blob = await res.blob();
+        } catch (err) {
+          console.error('Failed to fetch preview image for upload:', err);
+          alert('Failed to prepare image for upload');
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', blob, 'cover-photo.jpg');
+
+        const uploadRes = await fetch(API_BASE + '/uploads', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + localStorage.getItem('accessToken')
+          },
+          body: formData
+        });
+
+        if (!uploadRes.ok) {
+          const txt = await uploadRes.text().catch(()=>null);
+          alert('Upload failed: ' + (txt || uploadRes.status));
+          return;
+        }
+
+        const result = await uploadRes.json();
+        const finalImageUrl = (/^https?:\/\//.test(result.url)) ? result.url : (API_ORIGIN + result.url);
+        const imgEl = qs('#editCoverPhotoImg');
+        if (imgEl) imgEl.src = finalImageUrl;
+
+        // Save state for update flow
+        window._editCoverPhotoFilename = result.filename;
+        window._editHasCoverPhoto = true;
+
+        // Hide cropper container if present
+        const cropper = qs('#editCropperContainer');
+        if (cropper) cropper.style.display = 'none';
+
+        showSuccessMessage('Cover Photo Ready', 'Cropped image uploaded and ready to attach to the post');
+        return;
+      }
+
+      // Edit: remove cover photo
+      if (target.closest && target.closest('#editRemoveCoverPhoto')) {
+        const imgPreview = qs('#editCoverPhotoPreview');
+        if (imgPreview) imgPreview.style.display = 'none';
+        window._editCoverPhotoFilename = null;
+        window._editHasCoverPhoto = false;
+        window._editRemoveCoverPhoto = true;
+        showSuccessMessage('Cover Photo Removed', 'Cover photo will be removed when you update the post');
+        return;
+      }
+
+      // Edit AI buttons fallback
+      if (target.closest && target.closest('#editGenerateHeadingBtn')) {
+        e.preventDefault(); if (typeof editGenerateHeading === 'function') editGenerateHeading(); return;
+      }
+      if (target.closest && target.closest('#editCheckSpellingBtn')) {
+        e.preventDefault(); if (typeof editCheckSpelling === 'function') editCheckSpelling(); return;
+      }
+      if (target.closest && target.closest('#editEnhanceContentBtn')) {
+        e.preventDefault(); if (typeof editEnhanceContent === 'function') editEnhanceContent(); return;
+      }
+      if (target.closest && target.closest('#editSuggestTimeBtn')) {
+        e.preventDefault(); if (typeof editSuggestOptimalTime === 'function') editSuggestOptimalTime(); return;
+      }
+
+      // Create/editor AI buttons fallback (non-edit view)
+      if (target.closest && target.closest('#generateHeadingBtn')) {
+        e.preventDefault(); if (typeof generateHeading === 'function') generateHeading(); return;
+      }
+      if (target.closest && target.closest('#checkSpellingBtn')) {
+        e.preventDefault(); if (typeof checkSpelling === 'function') checkSpelling(); return;
+      }
+      if (target.closest && target.closest('#enhanceContentBtn')) {
+        e.preventDefault(); if (typeof enhanceContent === 'function') enhanceContent(); return;
+      }
+      if (target.closest && target.closest('#suggestTimeBtn')) {
+        e.preventDefault(); if (typeof suggestOptimalTime === 'function') suggestOptimalTime(); return;
+      }
+    } catch (err) {
+      console.error('Delegation handler error:', err);
+    }
+  }, false);
+
+  // ===================
+  // EDIT MODE AI FUNCTIONALITY
+  // ===================
+  
+  // Initialize AI features for edit mode
+  function initEditAIFunctionality() {
+    console.log('🤖 Initializing Edit Mode AI features...');
+    
+    const editGenerateHeadingBtn = qs('#editGenerateHeadingBtn');
+    const editCheckSpellingBtn = qs('#editCheckSpellingBtn');
+    const editEnhanceContentBtn = qs('#editEnhanceContentBtn');
+    const editSuggestTimeBtn = qs('#editSuggestTimeBtn');
+    const editSaveDraftBtn = qs('#editSaveDraftBtn');
+    const editSmartScheduleBtn = qs('#editSmartScheduleBtn');
+
+    if (editGenerateHeadingBtn) {
+      editGenerateHeadingBtn.addEventListener('click', editGenerateHeading);
+      console.log('✅ Edit Generate Heading button connected');
+    }
+    if (editCheckSpellingBtn) {
+      editCheckSpellingBtn.addEventListener('click', editCheckSpelling);
+      console.log('✅ Edit Spell Check button connected');
+    }
+    if (editEnhanceContentBtn) {
+      editEnhanceContentBtn.addEventListener('click', editEnhanceContent);
+      console.log('✅ Edit Enhance Content button connected');
+    }
+    if (editSuggestTimeBtn) {
+      editSuggestTimeBtn.addEventListener('click', editSuggestOptimalTime);
+      console.log('✅ Edit Suggest Time button connected');
+    }
+    if (editSaveDraftBtn) {
+      editSaveDraftBtn.addEventListener('click', editSaveDraft);
+      console.log('✅ Edit Save Draft button connected');
+    }
+    if (editSmartScheduleBtn) {
+      editSmartScheduleBtn.addEventListener('click', editSmartSchedule);
+      console.log('✅ Edit Smart Schedule button connected');
+    }
+
+    console.log('🚀 Edit Mode AI features initialized successfully!');
+  }
+
+  // Edit mode AI functions
+  async function editGenerateHeading() {
+    const content = getEditContent();
+    const btn = qs('#editGenerateHeadingBtn');
+    
+    if (!content.trim()) {
+      showErrorMessage('No Content', 'Please write some content first before generating a heading');
+      qs('#editContent')?.focus();
+      return;
+    }
+
+    const originalHtml = btn.innerHTML;
+    try {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="bi bi-robot"></i> Generating...';
+
+      const res = await apiFetch('/ai/generate-heading', {
+        method: 'POST',
+        body: JSON.stringify({ content: stripHtml(content) })
+      });
+
+      if (res?.heading) {
+        qs('#editTitle').value = res.heading;
+        showSuccessMessage('Title Generated!', `New title: "${res.heading}"`);
+        displayEditResults({ heading: res.heading, type: 'heading' });
+      }
+    } catch (error) {
+      console.error('Edit generate heading error:', error);
+      showErrorMessage('Title Generation Failed', error.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
+  }
+
+  async function editCheckSpelling() {
+    const content = getEditContent();
+    const btn = qs('#editCheckSpellingBtn');
+    
+    if (!content.trim()) {
+      showErrorMessage('No Content', 'Please write some content first');
+      return;
+    }
+
+    const originalHtml = btn.innerHTML;
+    try {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="bi bi-robot"></i> Checking...';
+
+      // Call the same backend route used by the create/editor view
+      const response = await fetch(API_BASE + '/ai/check-spelling', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + localStorage.getItem('accessToken')
+        },
+        body: JSON.stringify({ text: stripHtml(content) })
+      });
+
+      const res = await response.json();
+      if (res && res.errors) {
+        displayEditSpellingResults(res.errors);
+        if (res.errors.length === 0) showSuccessMessage('Spell Check Complete', 'No errors found!');
+      } else if (res && res.success === false) {
+        throw new Error(res.message || 'Spell check failed');
+      }
+    } catch (error) {
+      console.error('Edit spell check error:', error);
+      showErrorMessage('Spell Check Failed', error.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
+  }
+
+  async function editEnhanceContent() {
+    const content = getEditContent();
+    const title = qs('#editTitle')?.value || '';
+    const btn = qs('#editEnhanceContentBtn');
+    
+    if (!content.trim()) {
+      showErrorMessage('No Content', 'Please write some content first');
+      return;
+    }
+
+    const originalHtml = btn.innerHTML;
+    try {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="bi bi-robot"></i> Analyzing...';
+
+      // Use the same enhancement endpoint as the create view
+      const response = await fetch(API_BASE + '/ai/enhance', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + localStorage.getItem('accessToken')
+        },
+        body: JSON.stringify({ content: stripHtml(content), title: title })
+      });
+
+      const res = await response.json();
+      if (res && res.success) {
+        displayEditEnhancementResults(res);
+      } else if (res && res.success === false) {
+        throw new Error(res.message || 'Enhancement failed');
+      }
+    } catch (error) {
+      console.error('Edit enhance content error:', error);
+      showErrorMessage('Content Enhancement Failed', error.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
+  }
+
+  async function editSuggestOptimalTime() {
+    const btn = qs('#editSuggestTimeBtn');
+    const originalHtml = btn.innerHTML;
+    
+    try {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="bi bi-clock"></i> Analyzing...';
+
+      // Use the same posting-time endpoint as the create view
+      const response = await fetch(API_BASE + '/ai/posting-time', {
+        method: 'GET',
+        headers: {
+          'Authorization': 'Bearer ' + localStorage.getItem('accessToken')
+        }
+      });
+
+      const res = await response.json();
+      if (res && (res.recommended || res.suggestedTime)) {
+        // support both field names (recommended / suggestedTime)
+        const suggested = res.recommended || res.suggestedTime;
+        qs('#editScheduledDateTime').value = suggested;
+        showSuccessMessage('Optimal Time Suggested!', `Best time to publish: ${new Date(suggested).toLocaleString()}`);
+      } else if (res && res.success === false) {
+        throw new Error(res.message || 'Time suggestion failed');
+      }
+    } catch (error) {
+      console.error('Edit time suggestion error:', error);
+      showErrorMessage('Time Suggestion Failed', error.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
+  }
+
+  async function editSaveDraft() {
+    const postId = qs('#editSaveDraftBtn')?.dataset.postId;
+    if (!postId) {
+      showErrorMessage('Error', 'Post ID not found');
+      return;
+    }
+
+    const btn = qs('#editSaveDraftBtn');
+    const originalHtml = btn.innerHTML;
+    
+    try {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="bi bi-save"></i> Saving...';
+
+      const updateData = {
+        title: qs('#editTitle')?.value || '',
+        content: getEditContent(),
+        tags: (qs('#editTags')?.value || '').split(',').map(t => t.trim()).filter(Boolean),
+        status: 'draft'
+      };
+
+      const res = await apiFetch(`/posts/${postId}`, {
+        method: 'PUT',
+        body: JSON.stringify(updateData)
+      });
+
+      if (res) {
+        showSuccessMessage('Draft Saved!', 'Your post has been saved as a draft');
+      }
+    } catch (error) {
+      console.error('Edit save draft error:', error);
+      showErrorMessage('Save Draft Failed', error.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
+  }
+
+  async function editSmartSchedule() {
+    const scheduledTime = qs('#editScheduledDateTime')?.value;
+    if (!scheduledTime) {
+      showErrorMessage('No Time Selected', 'Please select a time or use "Suggest Time" first');
+      return;
+    }
+
+    const postId = qs('#editSmartScheduleBtn')?.dataset.postId;
+    if (!postId) {
+      showErrorMessage('Error', 'Post ID not found');
+      return;
+    }
+
+    const btn = qs('#editSmartScheduleBtn');
+    const originalHtml = btn.innerHTML;
+    
+    try {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="bi bi-calendar-check"></i> Scheduling...';
+
+      const updateData = {
+        title: qs('#editTitle')?.value || '',
+        content: getEditContent(),
+        tags: (qs('#editTags')?.value || '').split(',').map(t => t.trim()).filter(Boolean),
+        status: 'scheduled',
+        scheduledAt: scheduledTime
+      };
+
+      const res = await apiFetch(`/posts/${postId}`, {
+        method: 'PUT',
+        body: JSON.stringify(updateData)
+      });
+
+      if (res) {
+        showSuccessMessage('Post Scheduled!', `Your post will be published on ${new Date(scheduledTime).toLocaleString()}`);
+      }
+    } catch (error) {
+      console.error('Edit smart schedule error:', error);
+      showErrorMessage('Smart Schedule Failed', error.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
+  }
+
+  // Helper functions for edit mode
+  function getEditContent() {
+    const editContent = qs('#editContent');
+    return editContent ? editContent.innerHTML : '';
+  }
+
+  function displayEditResults(data) {
+    const resultsArea = qs('#editAiResultsArea');
+    if (!resultsArea) return;
+
+    if (data.type === 'heading') {
+      resultsArea.innerHTML = `
+        <div class="alert alert-success">
+          <i class="bi bi-lightbulb"></i> <strong>Generated Title:</strong> "${data.heading}"
+        </div>
+      `;
+    }
+    
+    resultsArea.style.display = 'block';
+  }
+
+  function displayEditSpellingResults(errors) {
+    const resultsArea = qs('#editAiResultsArea');
+    if (!resultsArea) return;
+
+    if (errors.length === 0) {
+      resultsArea.innerHTML = `
+        <div class="alert alert-success">
+          <i class="bi bi-check-circle"></i> Great! No spelling errors found.
+        </div>
+      `;
+    } else {
+      const errorsList = errors.map(error => `
+        <li class="mb-1">
+          <strong>"${error.error}"</strong> → <span class="text-success">"${error.suggestion}"</span>
+          <small class="text-muted">(${error.position})</small>
+        </li>
+      `).join('');
+
+      resultsArea.innerHTML = `
+        <div class="alert alert-warning">
+          <h6><i class="bi bi-exclamation-triangle"></i> Found ${errors.length} spelling issue${errors.length > 1 ? 's' : ''}</h6>
+          <ul class="mb-0 mt-2">${errorsList}</ul>
+        </div>
+      `;
+    }
+    
+    resultsArea.style.display = 'block';
+  }
+
+  function displayEditEnhancementResults(data) {
+    const resultsArea = qs('#editAiResultsArea');
+    if (!resultsArea) return;
+
+    const seoClass = data.seoScore >= 80 ? 'success' : data.seoScore >= 60 ? 'warning' : 'danger';
+    
+    resultsArea.innerHTML = `
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="card border-0" style="background: rgba(255, 255, 255, 0.8);">
+            <div class="card-body p-3">
+              <h6><i class="bi bi-graph-up"></i> Content Metrics</h6>
+              <div class="d-flex justify-content-between mb-1">
+                <span>SEO Score:</span>
+                <span class="badge bg-${seoClass}">${data.seoScore}/100</span>
+              </div>
+              <div class="d-flex justify-content-between mb-1">
+                <span>Word Count:</span>
+                <span>${data.wordCount} words</span>
+              </div>
+              <div class="d-flex justify-content-between">
+                <span>Reading Time:</span>
+                <span>${data.readingTime}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card border-0" style="background: rgba(255, 255, 255, 0.8);">
+            <div class="card-body p-3">
+              <h6><i class="bi bi-lightbulb"></i> Suggestions</h6>
+              ${data.suggestions.length > 0 ? 
+                data.suggestions.slice(0, 3).map(s => `<small class="d-block mb-1">• ${s}</small>`).join('') :
+                '<small class="text-muted">No suggestions at this time</small>'
+              }
+            </div>
+          </div>
+        </div>
+        ${data.spellingErrors && data.spellingErrors.length > 0 ? `
+        <div class="col-12">
+          <div class="alert alert-info mb-0">
+            <strong>Spelling Check:</strong> Found ${data.spellingErrors.length} potential issue${data.spellingErrors.length > 1 ? 's' : ''}
+            ${data.spellingErrors.slice(0, 2).map(e => `<br><small>• "${e.error}" → "${e.suggestion}"</small>`).join('')}
+          </div>
+        </div>
+        ` : ''}
+      </div>
+    `;
+    
+    resultsArea.style.display = 'block';
+
+    // Auto-apply title if none exists
+    if (data.heading && !qs('#editTitle').value) {
+      qs('#editTitle').value = data.heading;
+    }
+  }
+
+  // Initialize AI features when DOM is ready
+  document.addEventListener('DOMContentLoaded', () => {
+    initAIFeatures();
+    setupEditorPlaceholder();
+  });
+
+  // Also initialize when navigating to create post
+  window.addEventListener('hashchange', () => {
+    if (location.hash.includes('editor') || location.hash.includes('create')) {
+      setTimeout(() => {
+        initAIFeatures();
+        setupEditorPlaceholder();
+      }, 100);
+    }
+  });
+
+  // Insert sample content for testing AI features
+  function insertSampleContent() {
+    const editor = qs('#editor');
+    if (editor) {
+      editor.innerHTML = `
+        <p>Artificial intelligence has fundamentally transformed how we approach content creation in the digital age. Modern AI writing assistants are no longer just simple grammar checkers—they've evolved into sophisticated tools that can analyze writing style, suggest improvements, and even generate creative content ideas.</p>
+        
+        <p>The integration of AI in blogging platforms offers several key benefits. First, AI can significantly reduce the time spent on editing and proofreading. Advanced algorithms can detect not only spelling and grammatical errors but also identify issues with sentence structure, readability, and tone consistency.</p>
+        
+        <p>Moreover, AI-powered content analysis helps bloggers optimize their posts for search engines. By analyzing keyword density, content structure, and readability metrics, these tools provide actionable insights that can improve a post's visibility and engagement rates.</p>
+        
+        <p>Looking ahead, we can expect AI writing assistance to become even more personalized and context-aware. Future developments may include real-time audience analysis, automated content adaptation for different platforms, and intelligent suggestion systems that learn from individual writing patterns.</p>
+      `;
+      
+      // Remove placeholder styling and classes
+      editor.style.color = '';
+      editor.style.fontStyle = '';
+      editor.classList.remove('editor-placeholder');
+      
+      // Focus on the editor and move cursor to end
+      editor.focus();
+      
+      // Move cursor to end of content
+      setTimeout(() => {
+        const range = document.createRange();
+        const sel = window.getSelection();
+        range.selectNodeContents(editor);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }, 0);
+      
+      showSuccessMessage('Sample Content Added!', 'Now try the AI features: Generate Title, Check Spelling, or Full Analysis');
+    }
+  }
+
+  // Setup editor placeholder functionality
+  function setupEditorPlaceholder() {
+    const editor = qs('#editor');
+    if (editor) {
+      // Clear placeholder on focus
+      editor.addEventListener('focus', function() {
+        if (this.innerHTML.includes('Try the AI features!') || this.innerHTML.includes('Insert Sample Blog Content')) {
+          this.innerHTML = '<p></p>';
+          this.style.color = '';
+          this.style.fontStyle = '';
+          // Move cursor to the paragraph
+          const p = this.querySelector('p');
+          if (p) {
+            p.focus();
+          }
+        }
+      });
+      
+      // Show placeholder if empty on blur
+      editor.addEventListener('blur', function() {
+        const isEmpty = this.innerHTML.trim() === '' || 
+                       this.innerHTML.trim() === '<p></p>' || 
+                       this.innerHTML.trim() === '<p><br></p>' ||
+                       this.textContent.trim() === '';
+                       
+        if (isEmpty) {
+          this.innerHTML = `
+            <p style="color: #6c757d; font-style: italic; pointer-events: none;" class="editor-placeholder">
+              ✨ <strong>Start writing your blog post...</strong>
+              <br><br>
+              Use the AI features below to enhance your content:
+              <br>• Generate compelling titles
+              <br>• Check spelling and grammar  
+              <br>• Get content suggestions
+              <br>• Schedule for optimal posting times
+              <br><br>
+              <span style="font-size: 0.9rem;">Need inspiration? → </span>
+              <button type="button" onclick="insertSampleContent()" style="font-size: 0.8rem; padding: 4px 12px; border: 1px solid #007bff; background: #e3f2fd; color: #007bff; cursor: pointer; border-radius: 4px; pointer-events: auto;">
+                📝 Insert Sample Content
+              </button>
+            </p>
+          `;
+        }
+      });
+      
+      // Handle keydown to clear placeholder on typing
+      editor.addEventListener('keydown', function(e) {
+        if (this.innerHTML.includes('Start writing your blog post...')) {
+          // Allow backspace and delete
+          if (e.key !== 'Backspace' && e.key !== 'Delete') {
+            this.innerHTML = '<p></p>';
+            // Move cursor to the paragraph
+            setTimeout(() => {
+              const p = this.querySelector('p');
+              if (p) {
+                const range = document.createRange();
+                const sel = window.getSelection();
+                range.setStart(p, 0);
+                range.collapse(true);
+                sel.removeAllRanges();
+                sel.addRange(range);
+              }
+            }, 0);
+          }
+        }
+      });
     }
   }
 

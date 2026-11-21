@@ -5,10 +5,8 @@ import User from '../models/userModel.js';
 export const register = async (req, res) => {
   try {
     const { username, email, password } = req.body;
-    // basic validation
     if (!username || !email || !password) return res.status(400).json({ message: 'username, email and password are required' });
 
-    // prevent duplicate username/email
     const existing = await User.findOne({ $or: [{ username }, { email }] });
     if (existing) {
       if (existing.username === username) return res.status(400).json({ message: 'Username already taken' });
@@ -23,7 +21,6 @@ export const register = async (req, res) => {
     res.json({ accessToken: token, user: safeUser });
   } catch (err) {
     console.error('Register error:', err);
-    // handle duplicate key error defensively
     if (err.code === 11000) return res.status(400).json({ message: 'Duplicate key error' });
     res.status(500).json({ message: 'Server error' });
   }

@@ -36,7 +36,7 @@ Add these in the **"Advanced"** section:
 
 ```bash
 # Required Environment Variables
-PORT=4000
+# Do NOT set PORT manually - Render injects the correct PORT automatically.
 MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/blogdb
 JWT_SECRET=your_super_secure_jwt_secret_here_minimum_32_characters
 CORS_ORIGIN=https://your-frontend-domain.netlify.app
@@ -46,6 +46,8 @@ NODE_ENV=production
 BCRYPT_ROUNDS=12
 JWT_EXPIRES_IN=2d
 ```
+
+> `backend/.env` is gitignored and is not uploaded to Render. All secrets must be added in the Render dashboard under **Environment**.
 
 ### Step 5: Database Setup (MongoDB Atlas)
 
@@ -129,12 +131,16 @@ curl -X POST https://your-backend.onrender.com/api/users/register \
 }
 ```
 
-### Issue 2: Database Connection Error
-**Error**: `MongoNetworkError`
+### Issue 2: Service exits right after `Connecting to database...`
+**Cause**: `MONGO_URI` is missing or MongoDB is unreachable. The old code exited before `app.listen()`, so Render also reported `No open ports detected`.
+
 **Solutions**:
-- Check MONGO_URI format
-- Verify MongoDB Atlas network access (0.0.0.0/0)
-- Confirm database user permissions
+- Add `MONGO_URI` in Render **Environment** (not just local `backend/.env`)
+- Confirm the Atlas user/password and database name in the URI
+- Allow `0.0.0.0/0` in MongoDB Atlas **Network Access**
+- Do not set `PORT` manually; Render injects it
+
+The updated server binds its port first and exposes `GET /api/health`. A `503` response with `"database": "DISCONNECTED"` means MongoDB is still the problem.
 
 ### Issue 3: CORS Errors
 **Error**: `Access-Control-Allow-Origin`

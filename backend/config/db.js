@@ -1,15 +1,23 @@
 import mongoose from 'mongoose';
 
 const connectDB = async () => {
-  try {
-    if (!process.env.MONGO_URI) {
-      throw new Error('MONGO_URI environment variable is not set');
-    }
-    
-    await mongoose.connect(process.env.MONGO_URI);
-  } catch (error) {
-    process.exit(1);
+  if (!process.env.MONGO_URI) {
+    throw new Error(
+      'MONGO_URI is not set. Add it in the Render dashboard: Environment > MONGO_URI.'
+    );
   }
+
+  await mongoose.connect(process.env.MONGO_URI, {
+    serverSelectionTimeoutMS: 10000,
+  });
+
+  mongoose.connection.on('disconnected', () => {
+    console.warn('MongoDB disconnected');
+  });
+
+  mongoose.connection.on('reconnected', () => {
+    console.log('MongoDB reconnected');
+  });
 };
 
 export default connectDB;
